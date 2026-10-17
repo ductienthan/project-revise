@@ -1,15 +1,15 @@
 """initial schema
 
-Revision ID: 465d0f1a56e0
+Revision ID: 14971b85c436
 Revises: 
-Create Date: 2026-10-17 16:01:11.774933
+Create Date: 2026-10-17 16:18:17.253035
 """
 import sqlalchemy as sa
 from alembic import op
 
 import preflight.db.base
 
-revision = '465d0f1a56e0'
+revision = '14971b85c436'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -22,8 +22,7 @@ def upgrade() -> None:
     sa.Column('username', sa.String(length=64), nullable=False),
     sa.Column('password_hash', sa.String(length=255), nullable=False),
     sa.Column('totp_secret', sa.String(length=64), nullable=True),
-    sa.Column('failed_logins', sa.Integer(), nullable=False),
-    sa.Column('locked_until', preflight.db.base.UTCDateTime(timezone=True), nullable=True),
+    sa.Column('totp_last_step', sa.Integer(), nullable=False),
     sa.Column('created_at', preflight.db.base.UTCDateTime(timezone=True), nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('username')

@@ -55,8 +55,9 @@ class Client:
         if not tokens:
             return False
         response = self._send("POST", "/auth/token/refresh", auth=False, json={"refresh_token": tokens["refresh_token"]})
-        if response.status_code != 200:
+        if response.status_code == 401:
             credentials.clear(self.base_url)
+        if response.status_code != 200:
             return False
         credentials.save(self.base_url, response.json())
         return True

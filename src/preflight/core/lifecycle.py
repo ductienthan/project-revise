@@ -70,8 +70,10 @@ def set_item_status(
         raise DomainError("The revisit date must be in the future.")
     item.status, item.reason = status, reason.strip()
     item.revisit_date = revisit if status == ItemStatus.DEFERRED else None
-    ready = project.status == ProjectStatus.DRAFT and project.checklist_built_at is not None
-    if ready and not unresolved_required(project):
-        transition(project, ProjectStatus.STARTED, at)
-        return True
-    return False
+    if project.status != ProjectStatus.DRAFT or project.checklist_built_at is None or unresolved_required(project):
+        return False
+    build_checklist(db, project, at)
+    if unresolved_required(project):
+        return False
+    transition(project, ProjectStatus.STARTED, at)
+    return True

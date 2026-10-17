@@ -45,7 +45,12 @@ def save(api_url: str, tokens: dict) -> None:
     path = _file()
     data = json.loads(path.read_text()) if path.exists() else {}
     data[api_url] = tokens
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    _write(data)
+
+
+def _write(data: dict) -> None:
+    fd = os.open(_file(), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    os.fchmod(fd, 0o600)
     with os.fdopen(fd, "w") as f:
         json.dump(data, f)
 
@@ -60,4 +65,4 @@ def clear(api_url: str) -> None:
     if path.exists():
         data = json.loads(path.read_text())
         data.pop(api_url, None)
-        path.write_text(json.dumps(data))
+        _write(data)

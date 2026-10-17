@@ -7,7 +7,16 @@ from sqlalchemy import select
 
 from preflight.db.models import Device
 from preflight.server.auth import service
-from preflight.server.deps import SESSION_COOKIE, AppSettings, CurrentPrincipal, Db, Now, rate_limit
+from preflight.server.deps import (
+    SESSION_COOKIE,
+    AppSettings,
+    CurrentPrincipal,
+    Db,
+    Lockouts,
+    Now,
+    Source,
+    rate_limit,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -60,9 +69,11 @@ def _auth_error(err: service.AuthError) -> HTTPException:
 
 
 @router.post("/login", dependencies=[rate_limit("login")])
-def login(body: LoginIn, response: Response, db: Db, settings: AppSettings, at: Now) -> dict:
+def login(
+    body: LoginIn, response: Response, db: Db, settings: AppSettings, lockout: Lockouts, source: Source, at: Now
+) -> dict:
     try:
-        user = service.authenticate(db, settings, body.username, body.password, body.totp, at)
+        user = service.authenticate(db, lockout, source, body.username, body.password, body.totp, at)
     except service.AuthError as err:
         db.commit()
         raise _auth_error(err) from None
@@ -108,9 +119,13 @@ def device_token(body: DeviceTokenIn, db: Db, settings: AppSettings, at: Now) ->
 
 
 @router.post("/token", dependencies=[rate_limit("login")])
-def password_token(body: PasswordTokenIn, db: Db, settings: AppSettings, at: Now) -> TokenOut:
+def password_token(
+    body: PasswordTokenIn, db: Db, settings: AppSettings, lockout: Lockouts, source: Source, at: Now
+) -> TokenOut:
     try:
-        pair = service.password_grant(db, settings, body.username, body.password, body.totp, body.device_name, at)
+        pair = service.password_grant(
+            db, settings, lockout, source, body.username, body.password, body.totp, body.device_name, at
+        )
     except service.AuthError as err:
         db.commit()
         raise _auth_error(err) from None

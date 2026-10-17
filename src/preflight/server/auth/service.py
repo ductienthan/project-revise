@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from preflight.config import Settings
 from preflight.db.models import AuditEvent, Device, DeviceCode, User, WebSession
+from preflight.server.auth.lockout import Lockout
 
 _hasher = PasswordHasher()
 _USER_CODE_ALPHABET = "BCDFGHJKLMNPQRSTVWXZ23456789"
@@ -56,28 +57,34 @@ def enable_totp(db: Session, user: User) -> str:
     return user.totp_secret
 
 
+def _accept_totp(user: User, code: str | None, now: datetime) -> bool:
+    """Accept a code from the current or a neighbouring 30-second step, each step only once."""
+    if not code:
+        return False
+    totp = pyotp.TOTP(user.totp_secret)
+    for offset in (-1, 0, 1):
+        at = now + timedelta(seconds=30 * offset)
+        step = totp.timecode(at)
+        if step > user.totp_last_step and secrets.compare_digest(totp.at(at), code):
+            user.totp_last_step = step
+            return True
+    return False
+
+
 def authenticate(
-    db: Session, settings: Settings, username: str, password: str, totp: str | None, now: datetime
+    db: Session, lockout: Lockout, source: str, username: str, password: str, totp: str | None, now: datetime
 ) -> User:
-    user = db.scalar(select(User).where(User.username == username))
-    if user is None:
-        verify_password(_DUMMY_HASH, password)
-        raise AuthError("invalid_credentials")
-    if user.locked_until and user.locked_until > now:
-        audit(db, user.id, "login_locked")
+    if lockout.locked(username, source, now):
         raise AuthError("locked")
-    ok = verify_password(user.password_hash, password)
+    user = db.scalar(select(User).where(User.username == username))
+    ok = verify_password(user.password_hash if user else _DUMMY_HASH, password) and user is not None
     if ok and user.totp_secret:
-        ok = bool(totp) and pyotp.TOTP(user.totp_secret).verify(totp, for_time=now, valid_window=1)
+        ok = _accept_totp(user, totp, now)
     if not ok:
-        user.failed_logins += 1
-        if user.failed_logins >= settings.max_failed_logins:
-            user.locked_until = now + timedelta(minutes=settings.lockout_minutes)
-            user.failed_logins = 0
-        audit(db, user.id, "login_failed")
+        lockout.record_failure(username, source, now)
+        audit(db, user.id if user else None, "login_failed", source)
         raise AuthError("invalid_credentials")
-    user.failed_logins = 0
-    user.locked_until = None
+    lockout.clear(username, source)
     if _hasher.check_needs_rehash(user.password_hash):
         user.password_hash = hash_password(password)
     return user
@@ -194,9 +201,17 @@ def poll_device_code(db: Session, settings: Settings, raw_device_code: str, now:
 
 
 def password_grant(
-    db: Session, settings: Settings, username: str, password: str, totp: str | None, name: str, now: datetime
+    db: Session,
+    settings: Settings,
+    lockout: Lockout,
+    source: str,
+    username: str,
+    password: str,
+    totp: str | None,
+    name: str,
+    now: datetime,
 ) -> TokenPair:
-    user = authenticate(db, settings, username, password, totp, now)
+    user = authenticate(db, lockout, source, username, password, totp, now)
     return _issue_tokens(db, settings, user.id, name[:100] or "cli", now)
 
 

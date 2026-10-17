@@ -33,6 +33,9 @@ def flush(client: Client) -> int:
             _rewrite(entries[index:])
             return sent
         except ApiError as err:
+            if err.status == 429 or err.status >= 500:
+                _rewrite(entries[index:])
+                return sent
             with (config_dir() / "queue.rejected.jsonl").open("a") as f:
                 f.write(json.dumps({**entry, "error": err.message}) + "\n")
             click.echo(f"Dropped a queued entry the server rejected: {err.message}", err=True)

@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -11,6 +12,7 @@ from preflight.core.errors import DomainError, NotFound
 from preflight.db.base import utcnow
 from preflight.db.session import make_engine, make_sessionmaker
 from preflight.server.api.v1 import router as api_v1
+from preflight.server.auth.lockout import Lockout
 from preflight.server.auth.ratelimit import RateLimiter
 from preflight.server.deps import LoginRequired
 from preflight.server.ui import pages
@@ -30,6 +32,7 @@ def create_app(settings: Settings | None = None, clock: Callable[[], datetime] =
     app.state.engine = make_engine(settings.database_url)
     app.state.sessionmaker = make_sessionmaker(app.state.engine)
     app.state.rate_limiter = RateLimiter(settings.rate_limit_per_minute)
+    app.state.lockout = Lockout(settings.max_failed_logins, settings.lockout_minutes)
 
     app.include_router(api_v1)
     app.include_router(pages.router)
@@ -45,7 +48,8 @@ def create_app(settings: Settings | None = None, clock: Callable[[], datetime] =
 
     @app.exception_handler(LoginRequired)
     async def _to_login(request: Request, _: LoginRequired):
-        return RedirectResponse(f"/login?next={request.url.path}", status_code=303)
+        target = request.url.path + (f"?{request.url.query}" if request.url.query else "")
+        return RedirectResponse(f"/login?next={quote(target, safe='/')}", status_code=303)
 
     @app.middleware("http")
     async def _security(request: Request, call_next):

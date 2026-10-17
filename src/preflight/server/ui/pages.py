@@ -13,8 +13,10 @@ from preflight.server.deps import (
     SESSION_COOKIE,
     AppSettings,
     Db,
+    Lockouts,
     Now,
     PagePrincipal,
+    Source,
     rate_limit,
 )
 
@@ -49,6 +51,8 @@ def login_submit(
     db: Db,
     settings: AppSettings,
     at: Now,
+    lockout: Lockouts,
+    source: Source,
     username: str = Form(),
     password: str = Form(),
     csrf_token: str = Form(),
@@ -59,7 +63,7 @@ def login_submit(
     if not cookie or not secrets.compare_digest(cookie, csrf_token):
         return render(request, "login.html", error="Your form expired. Try again.", login_csrf="", next="/", status_code=403)
     try:
-        user = service.authenticate(db, settings, username, password, totp or None, at)
+        user = service.authenticate(db, lockout, source, username, password, totp or None, at)
     except service.AuthError as err:
         db.commit()
         message = "Too many attempts. Try again later." if str(err) == "locked" else "Wrong username, password or code."

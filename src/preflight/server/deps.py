@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from preflight.config import Settings
 from preflight.db.models import Device, User, WebSession
 from preflight.server.auth import service
+from preflight.server.auth.lockout import Lockout
 
 SESSION_COOKIE = "preflight_session"
 LOGIN_CSRF_COOKIE = "preflight_login_csrf"
@@ -40,10 +41,21 @@ class Principal:
     device: Device | None = None
 
 
+def client_address(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def get_lockout(request: Request) -> Lockout:
+    return request.app.state.lockout
+
+
+Source = Annotated[str, Depends(client_address)]
+Lockouts = Annotated[Lockout, Depends(get_lockout)]
+
+
 def rate_limit(bucket: str):
     def check(request: Request) -> None:
-        key = request.client.host if request.client else "unknown"
-        if not request.app.state.rate_limiter.allow(bucket, key):
+        if not request.app.state.rate_limiter.allow(bucket, client_address(request)):
             raise HTTPException(429, "too many requests")
 
     return Depends(check)
