@@ -190,6 +190,9 @@ class RuleOut(Out):
     checklist_text: str
     status: RuleStatus
     created_at: datetime
+    verdict_at: datetime | None
+    failures_before: int | None
+    failures_after: int | None
 
 
 class StatusOut(BaseModel):
@@ -201,3 +204,4 @@ class StatusOut(BaseModel):
     failures: int
     wins: int
     minutes_lost: int
+    gate_overrides: list[str]

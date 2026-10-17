@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass
 from datetime import date, datetime
 
@@ -6,7 +7,15 @@ from sqlalchemy.orm import Session
 from preflight.core import review
 from preflight.core.checklist import build_checklist
 from preflight.core.errors import DomainError
-from preflight.db.models import ChecklistItem, GateOverride, ItemStatus, Project, ProjectStatus
+from preflight.db.models import (
+    ChecklistItem,
+    GateOverride,
+    ItemOutcome,
+    ItemStatus,
+    Project,
+    ProjectStatus,
+    Retrospective,
+)
 
 TRANSITIONS = {ProjectStatus.DRAFT: {ProjectStatus.STARTED}, ProjectStatus.STARTED: {ProjectStatus.CLOSED}}
 
@@ -71,6 +80,7 @@ def set_item_status(
         raise DomainError("The revisit date must be in the future.")
     item.status, item.reason = status, reason.strip()
     item.revisit_date = revisit if status == ItemStatus.DEFERRED else None
+    item.resolved_at = at if is_resolved(item) else None
     if project.status != ProjectStatus.DRAFT or project.checklist_built_at is None or unresolved_required(project):
         return False
     build_checklist(db, project, at, review.candidates(db, project))
@@ -78,3 +88,23 @@ def set_item_status(
         return False
     transition(project, ProjectStatus.STARTED, at)
     return True
+
+
+def close(
+    db: Session, project: Project, at: datetime, summary: str, outcomes: dict[uuid.UUID, ItemOutcome], summary_required: bool
+) -> Retrospective:
+    """Record the retrospective and item outcomes, then close. Closed data feeds patterns, drills and the dashboard."""
+    if project.status != ProjectStatus.STARTED:
+        raise DomainError(f"Only a started project can be closed. '{project.name}' is {project.status}.")
+    if summary_required and not summary.strip():
+        raise DomainError("Closing needs a retrospective summary.")
+    items = {i.id: i for i in project.checklist_items}
+    for item_id, outcome in outcomes.items():
+        if item_id not in items:
+            raise DomainError("That checklist item is not in this project.")
+        items[item_id].outcome = outcome
+    retrospective = Retrospective(user_id=project.user_id, project_id=project.id, summary=summary.strip())
+    project.retrospectives.append(retrospective)
+    transition(project, ProjectStatus.CLOSED, at)
+    db.flush()
+    return retrospective

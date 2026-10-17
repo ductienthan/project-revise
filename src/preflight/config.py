@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     api_url: str = "http://localhost:8000"
 
     capture_allow_private: bool = False
+    retrospective_required: bool = True
+    rule_observation_days: int = 28
     require_https: bool = False
     session_idle_minutes: int = 60 * 12
     access_token_minutes: int = 60

@@ -6,8 +6,8 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from preflight.core import failures, lifecycle, links, patterns, projects
-from preflight.db.models import Project
+from preflight.core import failures, lifecycle, links, patterns, progress, projects, report
+from preflight.db.models import FailureCategory, Project
 from preflight.server.auth import service
 from preflight.server.deps import (
     LOGIN_CSRF_COOKIE,
@@ -151,6 +151,21 @@ def snapshot_action(
             snapshot.approved = False
     db.commit()
     return RedirectResponse(f"/snapshots/{snapshot.id}", status_code=303)
+
+
+@router.get("/progress", response_class=HTMLResponse)
+def progress_page(request: Request, principal: PagePrincipal, db: Db, settings: AppSettings, at: Now) -> HTMLResponse:
+    data = progress.progress(db, principal.user.id, at, settings.rule_observation_days)
+    db.commit()
+    categories = [c.value for c in FailureCategory] + ["uncategorized"]
+    return render(request, "progress.html", principal, data=data, categories=categories)
+
+
+@router.get("/weekly", response_class=HTMLResponse)
+def weekly_page(request: Request, principal: PagePrincipal, db: Db, settings: AppSettings, at: Now) -> HTMLResponse:
+    data = report.weekly(db, principal.user.id, at, settings.rule_observation_days)
+    db.commit()
+    return render(request, "weekly.html", principal, r=data)
 
 
 @router.get("/failures", response_class=HTMLResponse)

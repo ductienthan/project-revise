@@ -5,12 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Preflight{% endblock %}</title>
   <link rel="stylesheet" href="/static/app.css">
+  {% block head %}{% endblock %}
   <script src="https://unpkg.com/htmx.org@2.0.3/dist/htmx.min.js" integrity="sha384-0895/pl2MU10Hqc6jd4RvrthNlDiE9U1tWmX7WRESftEDRosgxNsQG/Ze9YMRzHq" crossorigin="anonymous"></script>
 </head>
 <body{% if csrf %} hx-headers='{"X-CSRF-Token": "{{ csrf }}"}'{% endif %}>
   {% if user %}
   <nav>
     <a href="/">Projects</a>
+    <a href="/progress">Progress</a>
+    <a href="/weekly">Weekly</a>
     <a href="/failures">Failures</a>
     <a href="/rules">Rules</a>
     <form method="post" action="/logout" class="inline">

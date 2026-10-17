@@ -238,6 +238,7 @@ def scenario(run: Run) -> None:
 
     capture_links(run)
     ai_review(run)
+    close_and_report(run, web)
 
     home = web.get("/")
     run.ok(home.status_code == 200 and 'href="/projects/llm-gateway"' in home.text, "dashboard lists projects")
@@ -250,7 +251,7 @@ def scenario(run: Run) -> None:
     run.cli("auth", "revoke", desktop_id)
     out = run.cli("llm-gateway", "status", env=desktop, expect=1)
     run.ok("Run `preflight login`" in out, "a revoked device is locked out")
-    run.ok("is started" in run.cli("llm-gateway", "status"), "other devices keep working after a revoke")
+    run.ok("is closed" in run.cli("llm-gateway", "status"), "other devices keep working after a revoke")
     run.ok(web.get("/").status_code == 200, "the dashboard session survives a device revoke")
 
 
@@ -288,6 +289,42 @@ def capture_links(run: Run) -> None:
         run.ok(any(label.startswith("Snapshot: Rate limits v1") for label in labels), "only the approved snapshot version is offered to AI", str(labels))
     finally:
         site.close()
+
+
+def close_and_report(run: Run, web: httpx.Client) -> None:
+    items = run.cli("llm-gateway", "checklist")
+    count = len(re.findall(r"^\s*\d+\s+(?:required|optional)", items, re.MULTILINE))
+    answers = "Shipped the gateway\n\n" + "Forgot to rotate keys\n\n" + "h\n" + "\n" * (count - 1) + "Timeouts caught two outages.\n"
+    out = run.cli("llm-gateway", "close", input=answers)
+    run.ok("Closed llm-gateway." in out, "close runs the retrospective and closes the project", out)
+    status = run.cli("llm-gateway", "status")
+    run.ok("is closed" in status and "Wins: 3." in status and "Failures: 4" in status, "retrospective added the win and the late failure", status)
+    out = run.cli("next-thing", "close", input="\n\n" + "\n" * 10 + "Spike done.\n")
+    run.ok("The start gate was overridden: spike, accept the risk" in out, "the retrospective shows the gate override reason", out)
+
+    report = run.cli("report")
+    run.ok(re.search(r"Repeat rate, last 12 weeks: \d+% \(\d+ of \d+\)\. First guess right: \d+% \(\d+ of \d+\)", report) is not None
+           and "llm-gateway" in report,
+           "report shows progress with counts beside percentages", report)
+    week = run.cli("report", "--week")
+    run.ok(week.startswith("# Weekly report") and "## Wins" in week and "Shipped the gateway" in week, "weekly report lists this week's wins", week)
+
+    out_dir = run.workdir
+    run.cli("export", "--format", "json", "--out", str(out_dir / "all.json"))
+    data = json.loads((out_dir / "all.json").read_text())
+    run.ok({"projects", "failures", "checklist_items", "ai_calls"} <= set(data) and "users" not in data, "JSON export has every data table and no auth tables")
+    run.ok(any(p["name"] == "llm-gateway" and p["status"] == "closed" for p in data["projects"]), "export reflects the closed project")
+    out = run.cli("export", "--format", "csv", "--out", str(out_dir / "all.zip"))
+    import zipfile
+
+    names = zipfile.ZipFile(out_dir / "all.zip").namelist()
+    run.ok("Wrote" in out and "failures.csv" in names and "snapshots.csv" in names, "CSV export is a zip of tables")
+    md = run.cli("export", "--format", "md")
+    run.ok("## llm-gateway (closed)" in md and "### Retrospective" in md and "Timeouts caught two outages." in md, "Markdown export includes the retrospective")
+
+    page = web.get("/progress")
+    run.ok(page.status_code == 200 and "Rule scoreboard" in page.text and "Rule: shared-state-safety" in page.text, "dashboard progress page shows the rule scoreboard")
+    run.ok("Weekly report" in web.get("/weekly").text, "dashboard weekly page loads")
 
 
 def ai_review(run: Run) -> None:

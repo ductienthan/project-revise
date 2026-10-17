@@ -1,3 +1,4 @@
+import json
 import webbrowser
 from pathlib import Path
 
@@ -134,6 +135,54 @@ def set_rule(rule_id: str, status: str | None, text: str | None) -> None:
     rule = _by_prefix(client.get("/rules"), rule_id, "rule")
     client.patch(f"/rules/{rule['id']}", json={"status": status, "checklist_text": text})
     click.echo("Rule updated.")
+
+
+@cli.command()
+@click.option("--week", is_flag=True, help="Show the weekly report instead of overall progress.")
+def report(week: bool) -> None:
+    """Show progress, or the weekly report."""
+    client = Client()
+    if week:
+        click.echo(client.get("/reports/weekly", params={"format": "md"}), nl=False)
+        return
+    data = client.get("/progress")
+    o = data["overall"]
+    console.print(f"Repeat rate, last 12 weeks: {o['repeat_rate_12_weeks']['text']}. First guess right: {o['guess_accuracy']['text']}.")
+    hours = o["median_hours_to_root_cause"]
+    console.print(f"Failures: {o['failures']}, {o['minutes_lost']} minutes lost"
+                  + (f", median {hours} h to root cause." if hours is not None else "."))
+    if o["closed_predictions"]:
+        console.print(f"Calibration gap: {o['calibration_gap']:+.0%} over {o['closed_predictions']} predictions (positive means overconfident).")
+    console.print(f"Drill retention: {o['drill_retention']['text']}.")
+    rules = ", ".join(f"{n} {status}" for status, n in o["rule_status"].items() if n)
+    if rules:
+        console.print(f"Rules: {rules}.")
+    table = Table("project", "status", "failures", "repeat rate", "on checklist", "missed items", "wins")
+    for p in data["projects"]:
+        table.add_row(p["name"], p["status"], str(p["failures"]), p["repeat_rate"]["text"],
+                      p["on_checklist_rate"]["text"], p["missed_item_rate"]["text"], str(p["wins"]))
+    console.print(table)
+
+
+@cli.command()
+@click.option("--format", "fmt", type=click.Choice(["json", "csv", "md"]), default="json")
+@click.option("--out", type=click.Path(dir_okay=False, writable=True), help="Write to a file instead of stdout.")
+def export(fmt: str, out: str | None) -> None:
+    """Export all data as JSON, CSV (a zip of tables), or Markdown."""
+    client = Client()
+    if fmt == "csv":
+        path = Path(out or "preflight-export.zip")
+        response = client.raw("GET", "/export", params={"format": "csv"})
+        path.write_bytes(response.content)
+        click.echo(f"Wrote {path} ({len(response.content):,} bytes).")
+        return
+    body = client.get("/export", params={"format": fmt})
+    text = body if isinstance(body, str) else json.dumps(body, indent=2)
+    if out:
+        Path(out).write_text(text)
+        click.echo(f"Wrote {out}.")
+    else:
+        click.echo(text)
 
 
 @cli.command()

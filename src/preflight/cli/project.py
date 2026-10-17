@@ -371,6 +371,38 @@ def refresh(link_id: str, no_input: bool) -> None:
     _review_snapshot(client, client.post(f"/links/{matches[0]['id']}/refresh"), no_input)
 
 
+OUTCOME_KEYS = {"h": "helped", "m": "missed", "i": "irrelevant"}
+
+
+@project.command()
+@click.option("--summary", help="Retrospective summary. Prompted for when missing.")
+def close(summary: str | None) -> None:
+    """Run the retrospective and close the project."""
+    name, client = _ctx()
+    status = client.get(f"/projects/{name}/status")
+    if status["project"]["status"] != "started":
+        raise click.ClickException(f"Only a started project can be closed. '{name}' is {status['project']['status']}.")
+    for reason in status["gate_overrides"]:
+        click.echo(f"The start gate was overridden: {reason}")
+    click.echo("Wins to record (blank to finish):")
+    while text := click.prompt("  win", default="", show_default=False):
+        client.post(f"/projects/{name}/wins", json={"id": str(uuid.uuid4()), "text": text})
+    click.echo("Failures you have not logged yet (blank to finish):")
+    while title := click.prompt("  failure", default="", show_default=False):
+        client.post(f"/projects/{name}/failures", json={"id": str(uuid.uuid4()), "title": title})
+    outcomes = {}
+    items = client.get(f"/projects/{name}/checklist")["items"]
+    if items:
+        click.echo("For each checklist item: [h]elped, [m]issed (should have caught something), [i]rrelevant, Enter to skip.")
+    for item in items:
+        key = click.prompt(f"  {item['position']}. {item['text']}", default="", show_default=False)
+        if key in OUTCOME_KEYS:
+            outcomes[item["id"]] = OUTCOME_KEYS[key]
+    summary = summary or click.prompt("Summary: what went well, what failed, what to change")
+    client.post(f"/projects/{name}/close", json={"summary": summary, "outcomes": outcomes})
+    click.echo(f"Closed {name}. Its failures now feed patterns, rules, drills, and the dashboard.")
+
+
 @project.command()
 def status() -> None:
     """Show progress for the project."""

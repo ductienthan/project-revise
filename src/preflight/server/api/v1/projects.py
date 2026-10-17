@@ -144,5 +144,6 @@ def status(project: ProjectRef) -> StatusOut:
         failures=len(project.failures),
         wins=len(project.wins),
         minutes_lost=sum(f.minutes_lost for f in project.failures),
+        gate_overrides=[o.reason for o in project.gate_overrides],
     )
 

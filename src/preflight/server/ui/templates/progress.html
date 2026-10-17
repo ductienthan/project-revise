@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Progress · Preflight{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js" integrity="sha384-Sse/HDqcypGpyTDpvZOJNnG0TT3feGQUkF9H+mnRvic+LjR+K1NhTt8f51KIQ3v3" crossorigin="anonymous" defer></script>
+<script src="/static/progress.js" defer></script>
+{% endblock %}
+{% block content %}
+{% set o = data.overall %}
+<div class="viz-root">
+<h1>Progress</h1>
+
+<section class="hero" aria-label="Repeat rate">
+  <div class="hero-label">Repeat rate, last 12 weeks</div>
+  <div class="hero-value">{% if o.repeat_rate_12_weeks.den %}{{ (o.repeat_rate_12_weeks.value * 100) | round | int }}%{% else %}No data yet{% endif %}</div>
+  <div class="muted">{% if o.repeat_rate_12_weeks.den %}{{ o.repeat_rate_12_weeks.num }} of {{ o.repeat_rate_12_weeks.den }} failures repeated a category seen in the 60 days before. Lower is better.{% else %}Log failures to see whether you repeat them.{% endif %}</div>
+</section>
+
+<section class="tiles">
+  <div class="tile"><div class="tile-label">First guess right</div><div class="tile-value">{{ o.guess_accuracy.text }}</div></div>
+  <div class="tile"><div class="tile-label">Minutes lost</div><div class="tile-value">{{ "{:,}".format(o.minutes_lost) }}</div></div>
+  <div class="tile"><div class="tile-label">Median time to root cause</div><div class="tile-value">{% if o.median_hours_to_root_cause is not none %}{{ o.median_hours_to_root_cause }} h{% else %}No data yet{% endif %}</div></div>
+  <div class="tile"><div class="tile-label">Calibration gap</div><div class="tile-value">{% if o.calibration_gap is not none %}{{ "%+d" | format((o.calibration_gap * 100) | round | int) }} pts{% else %}No data yet{% endif %}</div><div class="muted small">{% if o.closed_predictions %}{{ o.closed_predictions }} closed predictions. Positive means overconfident.{% endif %}</div></div>
+  <div class="tile"><div class="tile-label">Drill retention</div><div class="tile-value">{{ o.drill_retention.text }}</div></div>
+  <div class="tile"><div class="tile-label">Not on any checklist</div><div class="tile-value">{{ o.not_on_checklist }}</div><div class="muted small">These seed items for the next project.</div></div>
+</section>
+
+<section aria-labelledby="weekly-title">
+  <h2 id="weekly-title">Failures per week by category</h2>
+  <div class="chart-box"><canvas id="weekly-chart" role="img" aria-label="Stacked columns of failures per week for the last 12 weeks, by category. The table below has the same numbers."></canvas></div>
+  <details>
+    <summary>Show as a table</summary>
+    <table class="num">
+      <thead><tr><th>Week of</th>{% for c in categories %}{% if c in data.failures_per_week %}<th>{{ c }}</th>{% endif %}{% endfor %}</tr></thead>
+      <tbody>
+      {% for week in data.failures_per_week.weeks %}{% set i = loop.index0 %}
+        <tr><td>{{ week }}</td>{% for c in categories %}{% if c in data.failures_per_week %}<td>{{ data.failures_per_week[c][i] }}</td>{% endif %}{% endfor %}</tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </details>
+</section>
+
+<section aria-labelledby="accuracy-title">
+  <h2 id="accuracy-title">First guess right, by month</h2>
+  {% if data.guess_accuracy_by_month %}
+  <div class="chart-box short"><canvas id="accuracy-chart" role="img" aria-label="Line of the share of failures where the first guess matched the real cause, by month."></canvas></div>
+  <details><summary>Show as a table</summary>
+    <table class="num"><thead><tr><th>Month</th><th>Right</th></tr></thead>
+    <tbody>{% for m in data.guess_accuracy_by_month %}<tr><td>{{ m.month }}</td><td>{{ m.text }}</td></tr>{% endfor %}</tbody></table>
+  </details>
+  {% else %}
+  <p class="muted">The trend appears once three months have failures with both a first guess and a real cause.</p>
+  {% endif %}
+</section>
+
+<section aria-labelledby="projects-title">
+  <h2 id="projects-title">Project by project</h2>
+  {% if data.projects %}
+  <div class="scroll">
+  <table class="num">
+    <thead><tr><th>Project</th><th>Status</th><th>Failures</th><th>Repeat rate</th><th>Coverage at start</th><th>On checklist</th><th>Missed items</th><th>Questions answered</th><th>Helped / missed / irrelevant</th><th>Wins</th></tr></thead>
+    <tbody>
+    {% for p in data.projects %}
+      <tr>
+        <td><a href="/projects/{{ p.name }}">{{ p.name }}</a>{% if p.gate_overridden %} <span class="tag">gate overridden</span>{% endif %}</td>
+        <td>{{ p.status }}</td><td>{{ p.failures }}</td><td>{{ p.repeat_rate.text }}</td><td>{{ p.checklist_coverage.text }}</td>
+        <td>{{ p.on_checklist_rate.text }}</td><td>{{ p.missed_item_rate.text }}</td><td>{{ p.question_coverage.text }}</td>
+        <td>{{ p.outcomes.helped }} / {{ p.outcomes.missed }} / {{ p.outcomes.irrelevant }}</td><td>{{ p.wins }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}<p class="muted">No projects yet.</p>{% endif %}
+</section>
+
+<section aria-labelledby="rules-title">
+  <h2 id="rules-title">Rule scoreboard</h2>
+  {% if data.rules %}
+  <table class="num">
+    <thead><tr><th>Rule</th><th>Pattern</th><th>Status</th><th>Failures before</th><th>Failures after</th><th>Judged</th></tr></thead>
+    <tbody>{% for r in data.rules %}<tr><td>{{ r.text }}</td><td class="muted">{{ r.pattern }}</td><td>{{ r.status }}</td><td>{{ r.before if r.before is not none else "" }}</td><td>{{ r.after if r.after is not none else "" }}</td><td>{{ r.verdict_at or "not yet" }}</td></tr>{% endfor %}</tbody>
+  </table>
+  <p class="muted small">Before counts the observation period ahead of the rule. After counts the latest period.</p>
+  {% else %}<p class="muted">No rules yet.</p>{% endif %}
+</section>
+
+<script type="application/json" id="progress-data">{{ {"weekly": data.failures_per_week, "accuracy": data.guess_accuracy_by_month, "categories": categories} | tojson }}</script>
+</div>
+{% endblock %}

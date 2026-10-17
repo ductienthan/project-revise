@@ -39,7 +39,7 @@ def create_app(
     app.state.ai = ai
     app.state.fetcher = Fetcher(allow_private=settings.capture_allow_private)
     app.state.engine = make_engine(settings.database_url)
-    app.state.sessionmaker = make_sessionmaker(app.state.engine)
+    app.state.sessionmaker = make_sessionmaker(app.state.engine, clock)
     app.state.rate_limiter = RateLimiter(settings.rate_limit_per_minute)
     app.state.lockout = Lockout(settings.max_failed_logins, settings.lockout_minutes)
 

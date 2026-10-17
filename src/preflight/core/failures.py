@@ -64,6 +64,7 @@ def log_failure(db: Session, project: Project, data: FailureInput, failure_id: u
             user_id=project.user_id,
             project_id=project.id,
             occurred_at=data.occurred_at or at,
+            root_cause_at=at if data.root_cause.strip() else None,
             **values,
         )
         db.add(failure)
@@ -101,9 +102,11 @@ def link_failure(db: Session, failure: Failure, item_id: uuid.UUID | None) -> No
     failure.checklist_item_id, failure.on_checklist = item.id, True
 
 
-def update_failure(failure: Failure, changes: dict) -> None:
+def update_failure(failure: Failure, changes: dict, at: datetime) -> None:
     for key, value in changes.items():
         setattr(failure, key, value)
+    if failure.root_cause.strip() and failure.root_cause_at is None:
+        failure.root_cause_at = at
 
 
 def get_failure(db: Session, user_id: uuid.UUID, failure_id: uuid.UUID) -> Failure:

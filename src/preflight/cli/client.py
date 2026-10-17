@@ -62,7 +62,7 @@ class Client:
         credentials.save(self.base_url, response.json())
         return True
 
-    def request(self, method: str, path: str, auth: bool = True, **kwargs):
+    def raw(self, method: str, path: str, auth: bool = True, **kwargs) -> httpx.Response:
         response = self._send(method, path, auth, **kwargs)
         if response.status_code == 401 and auth and self._refresh():
             response = self._send(method, path, auth, **kwargs)
@@ -74,6 +74,10 @@ class Client:
             except ValueError:
                 detail = response.text
             raise ApiError(response.status_code, detail)
+        return response
+
+    def request(self, method: str, path: str, auth: bool = True, **kwargs):
+        response = self.raw(method, path, auth, **kwargs)
         if not response.content:
             return None
         if response.headers.get("content-type", "").startswith("application/json"):

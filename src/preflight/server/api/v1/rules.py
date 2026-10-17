@@ -2,7 +2,7 @@ import uuid
 
 from fastapi import APIRouter
 
-from preflight.core import patterns
+from preflight.core import patterns, verdicts
 from preflight.server.api.v1.schemas import (
     PatternOut,
     PatternSuggestion,
@@ -10,7 +10,7 @@ from preflight.server.api.v1.schemas import (
     RuleOut,
     RulePatch,
 )
-from preflight.server.deps import CurrentPrincipal, Db
+from preflight.server.deps import AppSettings, CurrentPrincipal, Db, Now
 
 router = APIRouter(tags=["rules"])
 
@@ -28,7 +28,9 @@ def list_patterns(principal: CurrentPrincipal, db: Db) -> list[PatternSuggestion
 
 
 @router.get("/rules")
-def list_rules(principal: CurrentPrincipal, db: Db) -> list[RuleOut]:
+def list_rules(principal: CurrentPrincipal, db: Db, settings: AppSettings, at: Now) -> list[RuleOut]:
+    verdicts.judge_rules(db, principal.user.id, at, settings.rule_observation_days)
+    db.commit()
     return [RuleOut.model_validate(r) for r in patterns.list_rules(db, principal.user.id)]
 
 

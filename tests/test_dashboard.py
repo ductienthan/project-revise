@@ -63,3 +63,14 @@ def test_snapshot_page_previews_edits_approves_and_deletes(app, web):
     assert "Links" in web.get("/projects/gateway").text
     web.post(f"/snapshots/{snapshot['id']}", data={"action": "delete", "csrf_token": token}, headers=no_header)
     assert web.get(f"/api/v1/snapshots/{snapshot['id']}").status_code == 404
+
+
+def test_progress_and_weekly_pages_render_numbers_with_a_table_view(web):
+    new_project(web, "billing")
+    fail(web, "billing", "Lost update", category="state or concurrency bug", minutes_lost=25, guess_correct=True)
+    fail(web, "billing", "Double charge", category="state or concurrency bug", minutes_lost=15, guess_correct=False)
+    page = web.get("/progress").text
+    assert "50% (1 of 2)" in page and "Show as a table" in page and 'id="progress-data"' in page
+    assert "chart.js@4.4.6" in page and 'integrity="sha384-' in page
+    weekly = web.get("/weekly").text
+    assert "Failures: 2 (last week 0), 40 minutes lost." in weekly and "state or concurrency bug: 2" in weekly

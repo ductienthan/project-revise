@@ -28,3 +28,11 @@ ts	phase	decision	why	evidence	result
 2026-10-17T23:39:02Z	p5	Playwright stays an optional extra and is not exercised	it is a large install; design marks it optional	capture/browser.py	NOT VERIFIED: browser path untested
 2026-10-17T23:39:02Z	p5	e2e captures from a real local site over HTTP with PREFLIGHT_CAPTURE_ALLOW_PRIVATE=true	the fixture site is on 127.0.0.1; production keeps the guard on	tests/fakes.py FixtureSite, scripts/e2e.py capture_links	72/72 e2e
 2026-10-17T23:39:02Z	p5	a chained shell command committed before tests ran; reran pytest and e2e on that state and amended	a failing lint step short-circuited the chain	commit 3f6cb8d amended	95 tests, 72 e2e green
+2026-10-17T23:50:55Z	p6	added scripts/check.sh (lint, tests, e2e under set -e) and run it before each commit	a chained command let a commit through before tests ran	scripts/check.sh	encoded as a script
+2026-10-17T23:50:55Z	p6	the session stamps created_at from the app clock at flush	wall-clock created_at disagreed with the injected clock, breaking rule verdicts and weekly windows	db/session.py make_sessionmaker	tests green
+2026-10-17T23:50:55Z	p6	all period windows exclude their start and include their end	events at exactly now or at rule creation fell out of the window	core/report.py, core/verdicts.py	tests green
+2026-10-17T23:50:55Z	p6	rule verdict: fewer failures after than before (or none) is working, otherwise needs revision; retired stays manual	requirements name the three verdicts but not the rule for retired	core/verdicts.py verdict	open
+2026-10-17T23:50:55Z	p6	question coverage counts answered only, not 'not relevant'	literal reading of requirements 12.1	core/metrics.py question_coverage	open
+2026-10-17T23:50:55Z	p6	validated the 7-slot category palette in light and dark; light contrast WARN covered by table views	dataviz rule: run the validator, never eyeball	validate_palette.js output, templates/progress.html details tables	PASS both modes
+2026-10-17T23:50:55Z	p6	rendered the progress page in light, dark and a 390px iframe and looked at it	the validator checks color, not layout	scratchpad progress-light.png, progress-dark.png, progress-phone.png	no overflow at 390px
+2026-10-17T23:50:55Z	p6	e2e covers close, report, weekly, export json/csv/md and the dashboard progress page	phase predicate on the real product	scripts/e2e.py close_and_report	83/83 e2e

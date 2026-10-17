@@ -264,6 +264,7 @@ class ChecklistItem(Owned, Base):
     status: Mapped[ItemStatus] = mapped_column(str_enum(ItemStatus), default=ItemStatus.NOT_CHECKED)
     reason: Mapped[str] = mapped_column(Text, default="")
     revisit_date: Mapped[date | None] = mapped_column(Date)
+    resolved_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     outcome: Mapped[ItemOutcome | None] = mapped_column(str_enum(ItemOutcome))
 
 
@@ -275,6 +276,7 @@ class Failure(Owned, Base):
     what_happened: Mapped[str] = mapped_column(Text, default="")
     guessed_cause: Mapped[str] = mapped_column(Text, default="")
     root_cause: Mapped[str] = mapped_column(Text, default="")
+    root_cause_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     fix: Mapped[str] = mapped_column(Text, default="")
     prevention: Mapped[str] = mapped_column(Text, default="")
     category: Mapped[FailureCategory | None] = mapped_column(str_enum(FailureCategory))
@@ -303,6 +305,8 @@ class Rule(Owned, Base):
     checklist_text: Mapped[str] = mapped_column(Text)
     status: Mapped[RuleStatus] = mapped_column(str_enum(RuleStatus), default=RuleStatus.ACTIVE)
     verdict_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    failures_before: Mapped[int | None] = mapped_column(Integer)
+    failures_after: Mapped[int | None] = mapped_column(Integer)
 
 
 class Drill(Owned, Base):

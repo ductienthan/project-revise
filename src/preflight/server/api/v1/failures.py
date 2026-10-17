@@ -4,7 +4,7 @@ from fastapi import APIRouter
 
 from preflight.core import failures, projects
 from preflight.server.api.v1.schemas import FailureOut, FailurePatch
-from preflight.server.deps import CurrentPrincipal, Db
+from preflight.server.deps import CurrentPrincipal, Db, Now
 
 router = APIRouter(prefix="/failures", tags=["failures"])
 
@@ -22,10 +22,10 @@ def similar(failure_id: uuid.UUID, principal: CurrentPrincipal, db: Db) -> list[
 
 
 @router.patch("/{failure_id}")
-def patch(failure_id: uuid.UUID, body: FailurePatch, principal: CurrentPrincipal, db: Db) -> FailureOut:
+def patch(failure_id: uuid.UUID, body: FailurePatch, principal: CurrentPrincipal, db: Db, at: Now) -> FailureOut:
     failure = failures.get_failure(db, principal.user.id, failure_id)
     changes = body.model_dump(exclude_unset=True, exclude={"link_item_id", "not_on_checklist"})
-    failures.update_failure(failure, changes)
+    failures.update_failure(failure, changes, at)
     if body.link_item_id is not None or body.not_on_checklist:
         failures.link_failure(db, failure, body.link_item_id)
     db.commit()
