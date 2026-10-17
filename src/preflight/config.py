@@ -6,10 +6,14 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./preflight.db"
     secret_key: str = "dev-only"
-    admin_username: str = "admin"
-    admin_password: str | None = None
     anthropic_api_key: str | None = None
     api_url: str = "http://localhost:8000"
 
-
-settings = Settings()
+    require_https: bool = False
+    session_idle_minutes: int = 60 * 12
+    access_token_minutes: int = 60
+    device_code_minutes: int = 10
+    device_poll_seconds: int = 5
+    max_failed_logins: int = 5
+    lockout_minutes: int = 15
+    rate_limit_per_minute: int = 20

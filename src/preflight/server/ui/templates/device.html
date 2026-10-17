@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Connect a device · Preflight{% endblock %}
+{% block content %}
+<h1>Connect a device</h1>
+{% if approved %}
+<p class="ok">Connected "{{ approved }}". You can go back to your terminal.</p>
+{% else %}
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<p>Check that this code matches the one in your terminal.</p>
+<form method="post" action="/device" class="stack">
+  <input type="hidden" name="csrf_token" value="{{ csrf }}">
+  <label>Code <input name="code" value="{{ code }}" required></label>
+  <button type="submit">Connect</button>
+</form>
+{% endif %}
+{% endblock %}

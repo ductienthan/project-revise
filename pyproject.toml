@@ -6,6 +6,7 @@ dependencies = [
   "fastapi>=0.115",
   "uvicorn[standard]>=0.30",
   "jinja2>=3.1",
+  "python-multipart>=0.0.9",
   "pydantic>=2.8",
   "pydantic-settings>=2.4",
   "sqlalchemy>=2.0",
@@ -15,7 +16,7 @@ dependencies = [
   "httpx>=0.27",
   "click>=8.1",
   "rich>=13.7",
-  "questionary>=2.0",
+  "pyotp>=2.9",
   "keyring>=25.0",
 ]
 
@@ -23,10 +24,10 @@ dependencies = [
 ai = ["anthropic>=0.40"]
 capture = ["trafilatura>=1.12"]
 browser = ["playwright>=1.47"]
-totp = ["pyotp>=2.9"]
 
 [project.scripts]
 preflight = "preflight.cli.main:cli"
+preflight-server = "preflight.server.manage:manage"
 
 [dependency-groups]
 dev = ["pytest>=8.3", "ruff>=0.6"]

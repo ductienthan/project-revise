@@ -6,6 +6,8 @@ Create Date: ${create_date}
 """
 from alembic import op
 import sqlalchemy as sa
+
+import preflight.db.base
 ${imports if imports else ""}
 
 revision = ${repr(up_revision)}

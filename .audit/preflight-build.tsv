@@ -1,3 +1,9 @@
 ts	phase	decision	why	evidence	result
 2026-10-17T22:54:09Z	frame	scoped this run to build phases 1-3 with a fake AI client	operator picked phases 1-3 first and has no API key for tests	AskUserQuestion answer	open
 2026-10-17T22:54:09Z	frame	done = pytest green plus scripts/e2e.py driving the real CLI and server through login, capture and the checklist gate	check the real product, not just unit tests	scripts/e2e.py	open
+2026-10-17T23:04:05Z	p1	built auth as plain functions over the DB with an injectable clock: argon2, sessions, CSRF, lockout, TOTP, device flow, rotating refresh	lets tests drive lockout, expiry and device polling without sleeping	src/preflight/server/auth/service.py, tests/test_auth.py	24 tests green
+2026-10-17T23:04:05Z	p1	fixed TOTP check to use the injected clock instead of wall time	test_totp_is_required_once_enabled failed 401 vs 200	service.py authenticate for_time=now	fixed, test green
+2026-10-17T23:04:05Z	p1	recomputed the htmx SRI hash from the CDN file instead of trusting the one written from memory	never ship an integrity hash nobody checked	base.html; openssl dgst output matched	verified
+2026-10-17T23:04:05Z	p3	added projects.checklist_built_at and regenerated the initial migration	auto-start on check needed an explicit built marker, not a guess from requirements version	db/migrations/versions/465d0f1a56e0_initial_schema.py	migration applies on sqlite
+2026-10-17T23:04:05Z	p3	lowered priority bands to high>=4, medium>=2.5	a high-severity 40-minute failure scored medium, against requirements 9.3	tests/test_scoring.py, test_checklist.py	52 tests green
+2026-10-17T23:04:05Z	p3	approved rules apply to every project and replace failure items in their category	requirements do not define rule matching; global keeps v1 simple and avoids duplicate items	core/checklist.py build_checklist	open
