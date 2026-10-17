@@ -116,7 +116,10 @@ def build_checklist(db: Session, project: Project, at: datetime, extra: list[Can
     covered = {pattern.category for rule, pattern in rules if rule.status != RuleStatus.RETIRED}
     history = list(db.scalars(select(Failure).where(Failure.user_id == project.user_id, Failure.project_id != project.id)))
 
-    candidates = order(rule_candidates(rules) + failure_candidates(history, repeats, covered) + list(extra))
+    unique: dict[tuple[SourceType, str], Candidate] = {}
+    for c in rule_candidates(rules) + failure_candidates(history, repeats, covered) + list(extra):
+        unique.setdefault((c.source_type, c.source_ref), c)
+    candidates = order(list(unique.values()))
     existing = {(i.source_type, i.source_ref): i for i in project.checklist_items}
     keep = set()
     for position, c in enumerate(candidates, start=1):

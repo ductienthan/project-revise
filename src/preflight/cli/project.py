@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.table import Table
 
 from preflight.cli import queue
-from preflight.cli.client import Client, ServerUnreachable
+from preflight.cli.client import ApiError, Client, ServerUnreachable
 from preflight.db.models import FailureCategory, Severity, WinTag
 
 console = Console()
@@ -87,12 +87,66 @@ def requirements(path: str | None, text: str | None) -> None:
         click.echo(f"Saved requirements v{saved['version']}.")
 
 
+QUESTION_CHOICES = {"n": "not relevant", "d": "deferred"}
+
+
+def run_review(client: Client, name: str, again: bool) -> None:
+    found = client.get(f"/projects/{name}/review-items")
+    if not found["ai_available"]:
+        console.print("AI review is not available on this server. Building the checklist from your history and rules.")
+        return
+    current, last = found["requirements_version"], found["last_review_version"]
+    if last is not None and last == current and not again:
+        console.print(f"Using the earlier review of requirements v{current}. Pass --review-again to run a new one.")
+        return
+    if last is not None and last != current:
+        console.print(f"Requirements changed since the last review (v{last} to v{current}).")
+    if not found["items"]:
+        console.print("Nothing to review yet.")
+        return
+    console.print(f"Will be sent to AI ({found['model']}, at most about ${found['max_cost_usd']:.2f}). Approve each:")
+    if found["excluded_sensitive"]:
+        console.print(f"  {found['excluded_sensitive']} sensitive item(s) are never offered.")
+    approved = [
+        item["id"]
+        for n, item in enumerate(found["items"], start=1)
+        if click.confirm(f"  [{n}] {item['label']} (~{item['tokens']} tokens)  approve?", default=False)
+    ]
+    if not approved:
+        console.print("Nothing approved, nothing sent. Building the checklist from your history and rules.")
+        return
+    review = client.post(f"/projects/{name}/reviews", json={"approved_item_ids": approved})
+    console.print(f"Review done (${review['cost_usd']:.3f}). Questions based on your history:")
+    answers = []
+    for n, q in enumerate(review["questions"], start=1):
+        reply = click.prompt(f"  Q{n} ({q['category']}): {q['question']}\n    answer, [n]ot relevant, [d]efer, or Enter to leave open",
+                             default="", show_default=False)
+        if reply in QUESTION_CHOICES:
+            answers.append({"question_id": q["id"], "status": QUESTION_CHOICES[reply]})
+        elif reply.strip():
+            answers.append({"question_id": q["id"], "status": "answered", "answer": reply})
+    accepted = []
+    if review["drafts"]:
+        console.print("Suggested checklist items:")
+    for index, d in enumerate(review["drafts"]):
+        label = "gap" if d["kind"] == "gap" else d["priority"]
+        if click.confirm(f"  ({label}) {d['text']}. {d['why']} ({d['source_ref']})  add?", default=True):
+            accepted.append(index)
+    if review["dropped_drafts"]:
+        console.print(f"Dropped {review['dropped_drafts']} suggestion(s) that cited nothing you sent.")
+    client.post(f"/reviews/{review['id']}/answers", json={"answers": answers, "accepted_drafts": accepted})
+
+
 @project.command()
 @click.option("--override", "override_reason", help="Start anyway, recording this reason.")
-@click.option("--no-input", is_flag=True, help="Do not walk through required items.")
-def start(override_reason: str | None, no_input: bool) -> None:
-    """Build the checklist and pass the start gate."""
+@click.option("--no-ai", is_flag=True, help="Skip the AI review and use only history and rules.")
+@click.option("--review-again", is_flag=True, help="Run a new AI review even if one exists for these requirements.")
+@click.option("--no-input", is_flag=True, help="Skip the AI review and do not walk through required items.")
+def start(override_reason: str | None, no_ai: bool, review_again: bool, no_input: bool) -> None:
+    """Review the plan, build the checklist, and pass the start gate."""
     name, client = _ctx()
+    if not (no_ai or no_input or override_reason):
+        run_review(client, name, review_again)
     result = client.post(f"/projects/{name}/start", json={"override_reason": override_reason})
     print_checklist(result["checklist"])
     if result["started"]:
@@ -194,6 +248,10 @@ def fail(title: str, no_input: bool, occurred, **fields) -> None:
         return
     failure = logged["failure"]
     click.echo(f"Logged failure #{failure['id'][:8]}.")
+    if not no_input and not fields.get("category") and click.confirm(
+        "Ask AI to suggest a category and root cause? This sends the failure's text.", default=False
+    ):
+        _apply_suggestion(client, failure)
     if logged["project_status"] == "draft":
         click.echo(f"This project hasn't started yet. Run `preflight {name} start` to build its checklist.")
     for f in logged["similar"]:
@@ -212,6 +270,23 @@ def fail(title: str, no_input: bool, occurred, **fields) -> None:
         item = _item_by_position(client, name, int(answer))
         client.patch(f"/failures/{failure['id']}", json={"link_item_id": item["id"]})
         click.echo(f"Linked to item {answer}.")
+
+
+def _apply_suggestion(client: Client, failure: dict) -> None:
+    try:
+        s = client.post(f"/failures/{failure['id']}/suggest", json={"approved": True})
+    except ApiError as err:
+        click.echo(f"No suggestion: {err.message}")
+        return
+    click.echo(f"  Category: {s['category']}\n  Root cause: {s['root_cause']}\n  Prevention: {s['prevention']}")
+    if click.confirm("Use these?", default=False):
+        patch = {"category": s["category"]}
+        if not failure["root_cause"]:
+            patch["root_cause"] = s["root_cause"]
+        if not failure["prevention"]:
+            patch["prevention"] = s["prevention"]
+        client.patch(f"/failures/{failure['id']}", json=patch)
+        click.echo("Saved.")
 
 
 @project.command()

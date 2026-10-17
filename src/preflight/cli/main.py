@@ -113,10 +113,14 @@ def _by_prefix(rows: list[dict], prefix: str, what: str) -> dict:
 @rules.command("approve")
 @click.argument("pattern_id")
 @click.option("--text", help="Checklist text. Defaults to the suggested rule.")
-def approve(pattern_id: str, text: str | None) -> None:
+@click.option("--ai", "use_ai", is_flag=True, help="Ask AI to draft the rule from this pattern's failures.")
+def approve(pattern_id: str, text: str | None, use_ai: bool) -> None:
     client = Client()
     suggestion = _by_prefix([s["pattern"] | {"suggested_rule": s["suggested_rule"]} for s in client.get("/patterns")], pattern_id, "pattern")
-    text = text or click.prompt("Rule text", default=suggestion["suggested_rule"])
+    draft = suggestion["suggested_rule"]
+    if use_ai and click.confirm(f"Send the failures in '{suggestion['label']}' to AI to draft a rule?", default=False):
+        draft = client.post(f"/patterns/{suggestion['id']}/draft-rule", json={"approved": True})["checklist_text"]
+    text = text or click.prompt("Rule text", default=draft)
     rule = client.post("/rules", json={"pattern_id": suggestion["id"], "checklist_text": text})
     click.echo(f"Rule {rule['id'][:8]} is active and will appear in new checklists.")
 

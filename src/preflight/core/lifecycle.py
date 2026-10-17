@@ -3,6 +3,7 @@ from datetime import date, datetime
 
 from sqlalchemy.orm import Session
 
+from preflight.core import review
 from preflight.core.checklist import build_checklist
 from preflight.core.errors import DomainError
 from preflight.db.models import ChecklistItem, GateOverride, ItemStatus, Project, ProjectStatus
@@ -45,7 +46,7 @@ def start(db: Session, project: Project, at: datetime, override_reason: str | No
     """Build or refresh the checklist, then pass the gate. Calling it again after resolving items is safe."""
     if project.status != ProjectStatus.DRAFT:
         raise DomainError(f"'{project.name}' is already {project.status}.")
-    build_checklist(db, project, at)
+    build_checklist(db, project, at, review.candidates(db, project))
     unresolved = unresolved_required(project)
     if unresolved and override_reason is not None:
         if not override_reason.strip():
@@ -72,7 +73,7 @@ def set_item_status(
     item.revisit_date = revisit if status == ItemStatus.DEFERRED else None
     if project.status != ProjectStatus.DRAFT or project.checklist_built_at is None or unresolved_required(project):
         return False
-    build_checklist(db, project, at)
+    build_checklist(db, project, at, review.candidates(db, project))
     if unresolved_required(project):
         return False
     transition(project, ProjectStatus.STARTED, at)

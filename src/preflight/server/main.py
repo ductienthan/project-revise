@@ -7,6 +7,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from preflight.ai.client import AIClient, AnthropicClient
+from preflight.ai.gate import AIUnavailable
 from preflight.config import Settings
 from preflight.core.errors import DomainError, NotFound
 from preflight.db.base import utcnow
@@ -24,11 +26,16 @@ CSP = (
 )
 
 
-def create_app(settings: Settings | None = None, clock: Callable[[], datetime] = utcnow) -> FastAPI:
+def create_app(
+    settings: Settings | None = None, clock: Callable[[], datetime] = utcnow, ai: AIClient | None = None
+) -> FastAPI:
     settings = settings or Settings()
+    if ai is None and settings.anthropic_api_key:
+        ai = AnthropicClient(settings.anthropic_api_key, settings.anthropic_base_url)
     app = FastAPI(title="Preflight", docs_url=None, redoc_url=None)
     app.state.settings = settings
     app.state.clock = clock
+    app.state.ai = ai
     app.state.engine = make_engine(settings.database_url)
     app.state.sessionmaker = make_sessionmaker(app.state.engine)
     app.state.rate_limiter = RateLimiter(settings.rate_limit_per_minute)
@@ -41,6 +48,10 @@ def create_app(settings: Settings | None = None, clock: Callable[[], datetime] =
     @app.exception_handler(NotFound)
     async def _not_found(request: Request, err: NotFound):
         return JSONResponse({"detail": str(err)}, status_code=404)
+
+    @app.exception_handler(AIUnavailable)
+    async def _ai_unavailable(request: Request, err: AIUnavailable):
+        return JSONResponse({"detail": str(err)}, status_code=503)
 
     @app.exception_handler(DomainError)
     async def _domain(request: Request, err: DomainError):

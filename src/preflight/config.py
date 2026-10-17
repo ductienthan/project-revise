@@ -7,6 +7,10 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./preflight.db"
     secret_key: str = "dev-only"
     anthropic_api_key: str | None = None
+    anthropic_base_url: str | None = None
+    review_model: str = "claude-opus-5-5"
+    small_model: str = "claude-haiku-5-5"
+    ai_monthly_budget_usd: float = 5.0
     api_url: str = "http://localhost:8000"
 
     require_https: bool = False

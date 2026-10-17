@@ -18,11 +18,11 @@ dependencies = [
   "rich>=13.7",
   "pyotp>=2.9",
   "keyring>=25.0",
+  "anthropic>=1.15",
+  "trafilatura>=1.12",
 ]
 
 [project.optional-dependencies]
-ai = ["anthropic>=0.40"]
-capture = ["trafilatura>=1.12"]
 browser = ["playwright>=1.47"]
 
 [project.scripts]
@@ -47,3 +47,6 @@ line-length = 100
 
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = ["fastapi.Form", "fastapi.Depends"]
+
+[tool.ruff.lint]
+exclude = ["src/preflight/db/migrations/versions/*"]

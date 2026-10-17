@@ -205,23 +205,44 @@ class Snapshot(Owned, Base):
     captured_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
+class AiCall(Owned, Base):
+    """The exact payload sent to the model and the reply, kept for audit."""
+
+    __tablename__ = "ai_calls"
+
+    kind: Mapped[str] = mapped_column(String(32))
+    prompt_version: Mapped[str] = mapped_column(String(32))
+    model: Mapped[str] = mapped_column(String(64))
+    approved_items: Mapped[list] = mapped_column(JSON, default=list)
+    payload: Mapped[str] = mapped_column(Text)
+    response: Mapped[str] = mapped_column(Text, default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    error: Mapped[str] = mapped_column(Text, default="")
+
+
 class Review(Owned, Base):
     __tablename__ = "reviews"
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"), index=True)
     requirements_version: Mapped[int | None] = mapped_column(Integer)
     approved_items: Mapped[list] = mapped_column(JSON, default=list)
-    prompt_version: Mapped[str] = mapped_column(String(32), default="")
-    payload: Mapped[str] = mapped_column(Text, default="")
-    response: Mapped[str] = mapped_column(Text, default="")
+    ai_call_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ai_calls.id"))
+    drafts: Mapped[list] = mapped_column(JSON, default=list)
+    accepted_drafts: Mapped[list] = mapped_column(JSON, default=list)
+    completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
-    questions: Mapped[list["ReviewQuestion"]] = relationship(cascade="all, delete-orphan")
+    questions: Mapped[list["ReviewQuestion"]] = relationship(
+        cascade="all, delete-orphan", order_by="ReviewQuestion.position"
+    )
 
 
 class ReviewQuestion(Owned, Base):
     __tablename__ = "review_questions"
 
     review_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("reviews.id"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
     category: Mapped[str] = mapped_column(String(64))
     question: Mapped[str] = mapped_column(Text)
     answer: Mapped[str] = mapped_column(Text, default="")

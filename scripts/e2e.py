@@ -15,6 +15,10 @@ from pathlib import Path
 import httpx
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from tests.fakes import FakeAnthropic
+
 PASSWORD = "e2e correct horse battery"
 TIMEOUT_CHECK = "Every external call has a timeout, retry cap, and backoff"
 ATOMIC_CHECK = "Read-then-write on shared state is atomic"
@@ -28,7 +32,8 @@ def free_port() -> int:
 
 
 class Run:
-    def __init__(self, workdir: Path):
+    def __init__(self, workdir: Path, anthropic: FakeAnthropic):
+        self.anthropic = anthropic
         self.port = free_port()
         self.base = f"http://127.0.0.1:{self.port}"
         self.env = {
@@ -38,6 +43,8 @@ class Run:
             "PREFLIGHT_API_URL": self.base,
             "PREFLIGHT_NO_KEYRING": "1",
             "COLUMNS": "250",
+            "PREFLIGHT_ANTHROPIC_API_KEY": "sk-e2e-fake",
+            "PREFLIGHT_ANTHROPIC_BASE_URL": anthropic.url,
             "PREFLIGHT_CONFIG_DIR": str(workdir / "laptop"),
         }
         self.workdir = workdir
@@ -94,8 +101,9 @@ def page_csrf(web: httpx.Client, path: str) -> str:
 
 
 def main() -> None:
+    anthropic = FakeAnthropic()
     with tempfile.TemporaryDirectory() as tmp:
-        run = Run(Path(tmp))
+        run = Run(Path(tmp), anthropic)
         run.sh("alembic", "upgrade", "head")
         tables = run.sh("python", "-c", "from preflight.config import Settings; from sqlalchemy import create_engine, inspect; print(sorted(inspect(create_engine(Settings().database_url)).get_table_names()))")
         run.ok("'checklist_items'" in tables and "'users'" in tables, "alembic migration created the schema", tables)
@@ -108,6 +116,7 @@ def main() -> None:
             scenario(run)
         finally:
             run.stop_server()
+            anthropic.close()
         print(f"\nAll {run.checks} end-to-end checks passed.")
 
 
@@ -220,6 +229,8 @@ def scenario(run: Run) -> None:
     out = run.cli("next-thing", "start", "--override", "spike, accept the risk")
     run.ok("Gate overridden" in out, "the gate can be overridden with a typed reason")
 
+    ai_review(run)
+
     home = web.get("/")
     run.ok(home.status_code == 200 and 'href="/projects/llm-gateway"' in home.text, "dashboard lists projects")
     page = web.get("/projects/llm-gateway").text
@@ -233,6 +244,36 @@ def scenario(run: Run) -> None:
     run.ok("Run `preflight login`" in out, "a revoked device is locked out")
     run.ok("is started" in run.cli("llm-gateway", "status"), "other devices keep working after a revoke")
     run.ok(web.get("/").status_code == 200, "the dashboard session survives a device revoke")
+
+
+def ai_review(run: Run) -> None:
+    req = run.workdir / "ai-req.md"
+    req.write_text("Retries on provider errors.\nPer-user budgets.\n")
+    run.cli("new", "ai-gateway", "--idea", "SECRET-IDEA-TEXT", "--requirements", str(req), "--no-input")
+    answers = "n\ny\ny\n" + "3 attempts, 2s backoff, 10s deadline\nn\n\n" + "y\ny\n" + "d\n" * 20
+    out = run.cli("ai-gateway", "start", input=answers)
+    run.ok("Will be sent to AI (claude-opus-5-5, at most about $" in out, "review shows the model and a cost ceiling", out)
+    run.ok("[1] Idea and goals" in out and "[2] Requirements v1" in out and "[3] Failure history and rules" in out, "each item is offered for approval")
+    run.ok("Q1 (missed edge case): What are the max attempts" in out, "questions are grouped by past failure category")
+    run.ok("Dropped 1 suggestion(s) that cited nothing you sent." in out, "a suggestion with an invented reference is dropped")
+    run.ok("Define behavior when the provider returns 429" in out and "No answer yet: What happens to requests when the cache is down?" in out,
+           "accepted gap and the open question are on the checklist", out)
+    run.ok("Every provider call has a total deadline across retries" in out, "accepted AI checklist item is on the checklist")
+    run.ok("Required items resolved. Project started." in out, "walking the required items starts the project", out)
+
+    sent = run.anthropic.requests[-1]
+    material = "\n".join(b["text"] for b in sent["body"]["messages"][0]["content"])
+    run.ok("REQ:1 Retries on provider errors." in material and "Retry loop hung 40 minutes" in material, "approved items reached the model")
+    run.ok("SECRET-IDEA-TEXT" not in material, "an item that was not approved never left the server")
+    run.ok(sent["body"]["model"] == "claude-opus-5-5" and sent["body"]["fallbacks"] == "default"
+           and "server-side-fallback-2026-07-01" in sent["headers"]["anthropic-beta"], "review uses Opus 5.5 with refusal fallbacks")
+    run.ok(sent["body"]["messages"][0]["content"][0].get("cache_control") == {"type": "ephemeral"}, "failure history is the cached prefix")
+
+    out = run.cli("ai-gateway", "fail", "Webhook retries never stopped", input="\n" * 8 + "y\ny\nskip\n")
+    run.ok("Root cause: No deadline on the call" in out and "Saved." in out, "AI classification is suggested, confirmed and saved", out)
+    run.ok(run.anthropic.requests[-1]["body"]["model"] == "claude-haiku-5-5", "classification uses the cheaper model")
+    found = run.cli("search", "Webhook")
+    run.ok("missed edge case" in found and "No deadline on the call" in found, "suggested category and cause were stored", found)
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ from preflight.config import Settings
 from preflight.db.base import Base
 from preflight.server.auth import service
 from preflight.server.main import create_app
+from tests.fakes import FakeAI
 
 PASSWORD = "correct horse battery"
 
@@ -32,8 +33,14 @@ TEST_DATABASE_URL = os.environ.get("PREFLIGHT_TEST_DATABASE_URL", "sqlite://")
 
 
 @pytest.fixture
-def app(clock):
-    app = create_app(Settings(database_url=TEST_DATABASE_URL, rate_limit_per_minute=1000, _env_file=None), clock=clock)
+def ai():
+    return FakeAI()
+
+
+@pytest.fixture
+def app(clock, ai):
+    settings = Settings(database_url=TEST_DATABASE_URL, rate_limit_per_minute=1000, _env_file=None)
+    app = create_app(settings, clock=clock, ai=ai)
     Base.metadata.drop_all(app.state.engine)
     Base.metadata.create_all(app.state.engine)
     with app.state.sessionmaker() as db:
