@@ -46,10 +46,6 @@ def start(db: Session, project: Project, at: datetime, override_reason: str | No
     if project.status != ProjectStatus.DRAFT:
         raise DomainError(f"'{project.name}' is already {project.status}.")
     build_checklist(db, project, at)
-    return pass_gate(db, project, at, override_reason)
-
-
-def pass_gate(db: Session, project: Project, at: datetime, override_reason: str | None = None) -> StartResult:
     unresolved = unresolved_required(project)
     if unresolved and override_reason is not None:
         if not override_reason.strip():

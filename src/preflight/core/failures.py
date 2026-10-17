@@ -7,10 +7,20 @@ from sqlalchemy.orm import Session
 
 from preflight.core.errors import DomainError, NotFound
 from preflight.core.text import keywords, overlap
-from preflight.db.models import ChecklistItem, Failure, FailureCategory, Project, Severity, Win, WinTag
+from preflight.db.models import (
+    ChecklistItem,
+    Failure,
+    FailureCategory,
+    Project,
+    Severity,
+    Win,
+    WinTag,
+)
 
 RELATED_THRESHOLD = 0.34
-SEARCH_FIELDS = (Failure.title, Failure.what_happened, Failure.root_cause, Failure.fix, Failure.prevention)
+SEARCH_FIELDS = (
+    Failure.title, Failure.what_happened, Failure.guessed_cause, Failure.root_cause, Failure.fix, Failure.prevention
+)
 
 
 @dataclass(frozen=True)
@@ -37,7 +47,7 @@ class Logged:
 
 
 def failure_text(f: Failure) -> str:
-    return " ".join((f.title, f.what_happened, f.root_cause, f.prevention))
+    return f"{f.title} {f.what_happened} {f.root_cause} {f.prevention}"
 
 
 def log_failure(db: Session, project: Project, data: FailureInput, failure_id: uuid.UUID | None, at: datetime) -> Logged:
@@ -82,7 +92,6 @@ def similar_failures(db: Session, failure: Failure, limit: int = 5) -> list[Fail
 
 
 def link_failure(db: Session, failure: Failure, item_id: uuid.UUID | None) -> None:
-    """Link to a checklist item of the same project, or mark the failure as not on the checklist."""
     if item_id is None:
         failure.checklist_item_id, failure.on_checklist = None, False
         return

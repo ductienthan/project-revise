@@ -4,11 +4,10 @@ Revision ID: 465d0f1a56e0
 Revises: 
 Create Date: 2026-10-17 16:01:11.774933
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 import preflight.db.base
-
 
 revision = '465d0f1a56e0'
 down_revision = None

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Rules · Preflight{% endblock %}
+{% block content %}
+<h1>Rules</h1>
+<h2>Suggested</h2>
+{% if suggestions %}
+{% for p, draft in suggestions %}
+<form method="post" action="/rules" class="stack">
+  <input type="hidden" name="csrf_token" value="{{ csrf }}">
+  <input type="hidden" name="pattern_id" value="{{ p.id }}">
+  <strong>{{ p.label }}</strong>
+  <label>Rule text <textarea name="checklist_text" rows="2">{{ draft }}</textarea></label>
+  <button type="submit">Approve rule</button>
+</form>
+{% endfor %}
+{% else %}<p class="muted">No repeated patterns without a rule.</p>{% endif %}
+<h2>Active and past rules</h2>
+{% if rules %}
+<table>
+  <thead><tr><th>Rule</th><th>Pattern</th><th>Status</th></tr></thead>
+  <tbody>{% for r in rules %}<tr><td>{{ r.checklist_text }}</td><td class="muted">{{ labels.get(r.pattern_id, "") }}</td><td>{{ r.status }}</td></tr>{% endfor %}</tbody>
+</table>
+{% else %}<p class="muted">No rules yet.</p>{% endif %}
+{% endblock %}

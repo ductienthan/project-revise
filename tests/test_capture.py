@@ -72,7 +72,8 @@ def test_search_matches_any_text_field_and_filters_by_project(api):
     new_project(api, "a")
     new_project(api, "b")
     fail(api, "a", "Stale cache", root_cause="TTL ignored after prompt change")
-    fail(api, "b", "Deadlock in worker pool")
+    fail(api, "b", "Deadlock in worker pool", guessed_cause="lock ordering")
+    assert [f["title"] for f in api.get("/api/v1/failures", params={"q": "ordering"}).json()] == ["Deadlock in worker pool"]
     assert [f["title"] for f in api.get("/api/v1/failures", params={"q": "ttl prompt"}).json()] == ["Stale cache"]
     assert [f["title"] for f in api.get("/api/v1/failures", params={"project": "b"}).json()] == ["Deadlock in worker pool"]
 

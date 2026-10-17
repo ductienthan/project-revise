@@ -73,7 +73,11 @@ class Client:
             except ValueError:
                 detail = response.text
             raise ApiError(response.status_code, detail)
-        return response.json() if response.content else None
+        if not response.content:
+            return None
+        if response.headers.get("content-type", "").startswith("application/json"):
+            return response.json()
+        return response.text
 
     def get(self, path: str, **kwargs):
         return self.request("GET", path, **kwargs)

@@ -1,0 +1,15 @@
+{% if failures %}
+<table>
+  <thead><tr><th>Date</th>{% if names %}<th>Project</th>{% endif %}<th>Failure</th><th>Category</th><th>Severity</th><th>Min lost</th><th>Root cause</th></tr></thead>
+  <tbody>
+  {% for f in failures %}
+    <tr>
+      <td>{{ f.occurred_at.date() }}</td>
+      {% if names %}<td><a href="/projects/{{ names[f.project_id] }}">{{ names[f.project_id] }}</a></td>{% endif %}
+      <td>{{ f.title }}{% if f.on_checklist is false %} <span class="tag">not on checklist</span>{% endif %}</td>
+      <td>{{ f.category or "" }}</td><td>{{ f.severity }}</td><td>{{ f.minutes_lost }}</td><td>{{ f.root_cause }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="muted">No failures.</p>{% endif %}

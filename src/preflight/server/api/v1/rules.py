@@ -3,7 +3,13 @@ import uuid
 from fastapi import APIRouter
 
 from preflight.core import patterns
-from preflight.server.api.v1.schemas import PatternOut, PatternSuggestion, RuleIn, RuleOut, RulePatch
+from preflight.server.api.v1.schemas import (
+    PatternOut,
+    PatternSuggestion,
+    RuleIn,
+    RuleOut,
+    RulePatch,
+)
 from preflight.server.deps import CurrentPrincipal, Db
 
 router = APIRouter(tags=["rules"])

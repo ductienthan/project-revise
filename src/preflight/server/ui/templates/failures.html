@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Failures · Preflight{% endblock %}
+{% block content %}
+<h1>Failures</h1>
+<form method="get" action="/failures"><input name="q" value="{{ q }}" placeholder="Search failures" aria-label="Search failures"> <button>Search</button></form>
+{% set failures = rows %}
+{% include "_failures.html" %}
+{% endblock %}

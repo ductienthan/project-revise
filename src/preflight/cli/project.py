@@ -1,0 +1,245 @@
+import uuid
+from datetime import date
+from pathlib import Path
+
+import click
+from rich.console import Console
+from rich.table import Table
+
+from preflight.cli import queue
+from preflight.cli.client import Client, ServerUnreachable
+from preflight.db.models import FailureCategory, Severity, WinTag
+
+console = Console()
+CATEGORIES = [c.value for c in FailureCategory]
+STATUS_WORDS = {"done": "done", "na": "not applicable", "defer": "deferred"}
+
+
+@click.group()
+@click.argument("project")
+@click.pass_context
+def project(ctx: click.Context, project: str) -> None:
+    """Work on one project: preflight <project> <action>."""
+    ctx.obj = {"project": project, "client": Client()}
+
+
+def _ctx() -> tuple[str, Client]:
+    obj = click.get_current_context().obj
+    return obj["project"], obj["client"]
+
+
+def print_checklist(checklist: dict) -> None:
+    items = checklist["items"]
+    if not items:
+        console.print("Checklist is empty. No past failures or rules apply yet.")
+        return
+    required = sum(i["required"] for i in items)
+    version = checklist["project"]["checklist_requirements_version"]
+    built = f", built from requirements v{version}" if version else ""
+    console.print(f"Checklist ({required} required, {len(items) - required} optional{built}):")
+    table = Table("#", "", "item", "source", "status", box=None, pad_edge=False)
+    for i in items:
+        flag = "[red]required[/]" if i["required"] else "optional"
+        status = i["status"]
+        if i["reason"]:
+            status += f": {i['reason']}"
+        if i["revisit_date"]:
+            status += f" (until {i['revisit_date']})"
+        table.add_row(str(i["position"]), flag, i["text"], i["why"], status)
+    console.print(table)
+
+
+def _item_by_position(client: Client, name: str, n: int) -> dict:
+    checklist = client.get(f"/projects/{name}/checklist")
+    for item in checklist["items"]:
+        if item["position"] == n:
+            return item
+    raise click.ClickException(f"No checklist item {n}. Run `preflight {name} checklist`.")
+
+
+def _patch_item(client: Client, item: dict, status: str, reason: str = "", until: date | None = None) -> bool:
+    body = {"status": status, "reason": reason, "revisit_date": until.isoformat() if until else None}
+    result = client.patch(f"/checklist-items/{item['id']}", json=body)
+    if result["project_started"]:
+        console.print("Required items resolved. Project started.")
+    return result["project_started"]
+
+
+@project.command()
+@click.option("--file", "path", type=click.Path(exists=True, dir_okay=False))
+@click.option("--text")
+def requirements(path: str | None, text: str | None) -> None:
+    """Add or edit requirements. Each changed save is a new version."""
+    name, client = _ctx()
+    versions = client.get(f"/projects/{name}/requirements")
+    current = versions[-1]["text"] if versions else ""
+    if path:
+        text = Path(path).read_text()
+    elif text is None:
+        text = click.edit(current or "# Requirements for " + name + "\n")
+        if text is None:
+            click.echo("No change.")
+            return
+    saved = client.put(f"/projects/{name}/requirements", json={"text": text})
+    if versions and saved["version"] == versions[-1]["version"]:
+        click.echo(f"Unchanged, still v{saved['version']}.")
+    else:
+        click.echo(f"Saved requirements v{saved['version']}.")
+
+
+@project.command()
+@click.option("--override", "override_reason", help="Start anyway, recording this reason.")
+@click.option("--no-input", is_flag=True, help="Do not walk through required items.")
+def start(override_reason: str | None, no_input: bool) -> None:
+    """Build the checklist and pass the start gate."""
+    name, client = _ctx()
+    result = client.post(f"/projects/{name}/start", json={"override_reason": override_reason})
+    print_checklist(result["checklist"])
+    if result["started"]:
+        console.print("Project started." + (" Gate overridden." if override_reason else ""))
+        return
+    unresolved = result["checklist"]["unresolved_required"]
+    console.print(f"{len(unresolved)} required item(s) to resolve before the project can start.")
+    if no_input:
+        console.print(f"Resolve them with `preflight {name} check <n> done|na|defer`, or use --override.")
+        return
+    items = {i["position"]: i for i in result["checklist"]["items"]}
+    for n in unresolved:
+        item = items[n]
+        choice = click.prompt(f"{n}. {item['text']}\n   [d]one, [n]ot applicable, de[f]er, [s]kip", default="s")
+        if choice == "d":
+            started = _patch_item(client, item, "done")
+        elif choice == "n":
+            started = _patch_item(client, item, "not applicable", click.prompt("   Reason"))
+        elif choice == "f":
+            reason = click.prompt("   Reason")
+            until = click.prompt("   Revisit on (YYYY-MM-DD)", type=click.DateTime(["%Y-%m-%d"])).date()
+            started = _patch_item(client, item, "deferred", reason, until)
+        else:
+            continue
+        if started:
+            return
+
+
+@project.command()
+@click.option("--md", is_flag=True, help="Print as Markdown to paste into project docs.")
+def checklist(md: bool) -> None:
+    """Show the checklist and item statuses."""
+    name, client = _ctx()
+    if md:
+        click.echo(client.get(f"/projects/{name}/checklist", params={"format": "md"}), nl=False)
+        return
+    print_checklist(client.get(f"/projects/{name}/checklist"))
+
+
+@project.command()
+@click.argument("n", type=int)
+@click.argument("status", type=click.Choice(list(STATUS_WORDS)))
+@click.option("--reason", default="")
+@click.option("--until", type=click.DateTime(["%Y-%m-%d"]))
+def check(n: int, status: str, reason: str, until) -> None:
+    """Mark item <n> done, na (needs --reason) or defer (needs --reason and --until)."""
+    name, client = _ctx()
+    item = _item_by_position(client, name, n)
+    if not _patch_item(client, item, STATUS_WORDS[status], reason, until.date() if until else None):
+        click.echo(f"Item {n}: {STATUS_WORDS[status]}.")
+
+
+def _category_prompt() -> str | None:
+    for i, c in enumerate(CATEGORIES, start=1):
+        click.echo(f"  {i}. {c}")
+    choice = click.prompt("Category number (blank to skip)", default="", show_default=False)
+    return CATEGORIES[int(choice) - 1] if choice.isdigit() and 0 < int(choice) <= len(CATEGORIES) else None
+
+
+@project.command()
+@click.argument("title")
+@click.option("--what", "what_happened", default="")
+@click.option("--guess", "guessed_cause", default="")
+@click.option("--cause", "root_cause", default="")
+@click.option("--fix", default="")
+@click.option("--prevention", default="")
+@click.option("--category", type=click.Choice(CATEGORIES))
+@click.option("--severity", type=click.Choice([s.value for s in Severity]))
+@click.option("--minutes", "minutes_lost", type=int)
+@click.option("--guess-correct/--guess-wrong", default=None)
+@click.option("--date", "occurred", type=click.DateTime(["%Y-%m-%d"]), help="Backfill an older failure.")
+@click.option("--no-input", is_flag=True, help="Log only what was given on the command line.")
+def fail(title: str, no_input: bool, occurred, **fields) -> None:
+    """Log a failure. Blank prompts can be skipped and filled in later."""
+    name, client = _ctx()
+    if not no_input:
+        for key, label in (("what_happened", "What happened"), ("guessed_cause", "Your first guess at the cause"),
+                           ("root_cause", "Real cause (blank if unknown)"), ("fix", "Fix"),
+                           ("prevention", "Check that would have prevented it")):
+            if not fields[key]:
+                fields[key] = click.prompt(label, default="", show_default=False)
+        if fields["category"] is None:
+            fields["category"] = _category_prompt()
+        if fields["severity"] is None:
+            fields["severity"] = click.prompt("Severity", type=click.Choice([s.value for s in Severity]), default="medium")
+        if fields["minutes_lost"] is None:
+            fields["minutes_lost"] = click.prompt("Minutes lost", type=int, default=0)
+        if fields["guess_correct"] is None and fields["guessed_cause"] and fields["root_cause"]:
+            fields["guess_correct"] = click.confirm("Was your first guess right?", default=False)
+    body = {k: v for k, v in fields.items() if v is not None}
+    body.update(id=str(uuid.uuid4()), title=title)
+    if occurred:
+        body["occurred_at"] = occurred.date().isoformat() + "T12:00:00Z"
+    try:
+        logged = client.post(f"/projects/{name}/failures", json=body)
+    except ServerUnreachable:
+        queue.enqueue(f"/projects/{name}/failures", body)
+        click.echo("Server unreachable. Saved offline, will send on your next command.")
+        return
+    failure = logged["failure"]
+    click.echo(f"Logged failure #{failure['id'][:8]}.")
+    if logged["project_status"] == "draft":
+        click.echo(f"This project hasn't started yet. Run `preflight {name} start` to build its checklist.")
+    for f in logged["similar"]:
+        click.echo(f"  Similar: #{f['id'][:8]} {f['title']}" + (f" ({f['category']})" if f["category"] else ""))
+    related = logged["related_items"]
+    if related:
+        click.echo("Related checklist items: " + ", ".join(f"{i['position']}. {i['text']}" for i in related))
+    if no_input or logged["project_status"] == "draft":
+        return
+    choices = [str(i["position"]) for i in related] or ["<n>"]
+    answer = click.prompt(f"Link to a checklist item? [{'/'.join(choices)}/none/skip]", default="skip")
+    if answer == "none":
+        client.patch(f"/failures/{failure['id']}", json={"not_on_checklist": True})
+        click.echo("Marked as not on the checklist.")
+    elif answer.isdigit():
+        item = _item_by_position(client, name, int(answer))
+        client.patch(f"/failures/{failure['id']}", json={"link_item_id": item["id"]})
+        click.echo(f"Linked to item {answer}.")
+
+
+@project.command()
+@click.argument("text")
+@click.option("--tag", type=click.Choice([t.value for t in WinTag]))
+def win(text: str, tag: str | None) -> None:
+    """Log an achievement."""
+    name, client = _ctx()
+    body = {"id": str(uuid.uuid4()), "text": text, "tag": tag}
+    try:
+        client.post(f"/projects/{name}/wins", json=body)
+    except ServerUnreachable:
+        queue.enqueue(f"/projects/{name}/wins", body)
+        click.echo("Server unreachable. Saved offline, will send on your next command.")
+        return
+    click.echo("Logged win.")
+
+
+@project.command()
+def status() -> None:
+    """Show progress for the project."""
+    name, client = _ctx()
+    s = client.get(f"/projects/{name}/status")
+    p = s["project"]
+    version = f"v{s['requirements_version']}" if s["requirements_version"] else "none"
+    console.print(f"[bold]{p['name']}[/] is {p['status']}. Requirements: {version}.")
+    console.print(
+        f"Checklist: {s['checklist_resolved']}/{s['checklist_total']} resolved, "
+        f"{s['unresolved_required']} required open."
+    )
+    console.print(f"Failures: {s['failures']} ({s['minutes_lost']} min lost). Wins: {s['wins']}.")

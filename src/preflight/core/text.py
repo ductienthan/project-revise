@@ -1,8 +1,7 @@
 import re
 
 _STOPWORDS = frozenset(
-    "the and for with that this from into when then than have has had was were are not but all any can "
-    "its our out who why how what which while after before about over under each every only also just".split()
+    ["the", "and", "for", "with", "that", "this", "from", "into", "when", "then", "than", "have", "has", "had", "was", "were", "are", "not", "but", "all", "any", "can", "its", "our", "out", "who", "why", "how", "what", "which", "while", "after", "before", "about", "over", "under", "each", "every", "only", "also", "just"]
 )
 
 

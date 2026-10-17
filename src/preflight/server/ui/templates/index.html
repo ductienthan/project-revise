@@ -1,4 +1,19 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Projects</h1>
+{% if rows %}
+<table>
+  <thead><tr><th>Project</th><th>Status</th><th>Failures</th><th>Wins</th><th>Required open</th></tr></thead>
+  <tbody>
+  {% for p, failures, wins, open in rows %}
+    <tr>
+      <td><a href="/projects/{{ p.name }}">{{ p.name }}</a></td>
+      <td>{{ p.status }}</td><td>{{ failures }}</td><td>{{ wins }}</td><td>{{ open }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No projects yet. Create one with <code>preflight new &lt;name&gt;</code>.</p>
+{% endif %}
 {% endblock %}

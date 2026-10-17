@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} · Preflight{% endblock %}
+{% block content %}
+<h1>{{ project.name }} <span class="tag">{{ project.status }}</span></h1>
+{% if project.idea %}<p>{{ project.idea }}</p>{% endif %}
+{% if project.goals %}<p class="muted">Goals: {{ project.goals }}</p>{% endif %}
+<p class="muted">Requirements: {% if requirements %}v{{ requirements.version }}{% else %}none{% endif %}{% if project.checklist_requirements_version %}. Checklist built from v{{ project.checklist_requirements_version }}{% endif %}.</p>
+
+<h2>Checklist</h2>
+{% if project.checklist_items %}
+<table>
+  <thead><tr><th>#</th><th>Item</th><th>Why</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for i in project.checklist_items %}
+    <tr>
+      <td>{{ i.position }}</td>
+      <td>{{ i.text }} {% if i.required %}<span class="tag required">required</span>{% endif %} <span class="tag">{{ i.priority }}</span></td>
+      <td class="muted">{{ i.why }}</td>
+      <td>{{ i.status }}{% if i.reason %}: {{ i.reason }}{% endif %}{% if i.revisit_date %} (until {{ i.revisit_date }}){% endif %}{% if i.id in unresolved %} <span class="error">open</span>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No checklist yet. Run <code>preflight {{ project.name }} start</code>.</p>
+{% endif %}
+
+<h2>Failures</h2>
+{% include "_failures.html" %}
+
+<h2>Wins</h2>
+{% if project.wins %}
+<ul>{% for w in project.wins %}<li>{{ w.text }}{% if w.tag %} <span class="tag">{{ w.tag }}</span>{% endif %}</li>{% endfor %}</ul>
+{% else %}<p class="muted">None yet.</p>{% endif %}
+{% endblock %}

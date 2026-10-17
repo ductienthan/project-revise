@@ -48,14 +48,17 @@ def priority_for(score: float) -> Priority:
     return Priority.LOW
 
 
+def check_text(failure: Failure) -> str:
+    return failure.prevention.strip() or f"Guard against a repeat of: {failure.title}"
+
+
 def failure_candidates(failures: list[Failure], repeats: dict, covered_categories: set) -> list[Candidate]:
     """One item per distinct prevention check. Categories covered by a live rule are left to the rule."""
     by_text: dict[str, list[Failure]] = {}
     for f in failures:
         if f.category in covered_categories:
             continue
-        text = f.prevention.strip() or f"Guard against a repeat of: {f.title}"
-        by_text.setdefault(text.lower().rstrip("."), []).append(f)
+        by_text.setdefault(check_text(f).lower().rstrip("."), []).append(f)
 
     candidates = []
     for group in by_text.values():
@@ -72,7 +75,7 @@ def failure_candidates(failures: list[Failure], repeats: dict, covered_categorie
             Candidate(
                 SourceType.FAILURE,
                 str(lead.id),
-                (lead.prevention.strip() or f"Guard against a repeat of: {lead.title}"),
+                check_text(lead),
                 ", ".join(reasons),
                 priority_for(score),
                 required,

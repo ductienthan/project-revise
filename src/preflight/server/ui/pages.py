@@ -1,12 +1,22 @@
 import secrets
+import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from preflight.core import failures, lifecycle, patterns, projects
 from preflight.server.auth import service
-from preflight.server.deps import LOGIN_CSRF_COOKIE, SESSION_COOKIE, AppSettings, Db, Now, PagePrincipal, rate_limit
+from preflight.server.deps import (
+    LOGIN_CSRF_COOKIE,
+    SESSION_COOKIE,
+    AppSettings,
+    Db,
+    Now,
+    PagePrincipal,
+    rate_limit,
+)
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 router = APIRouter(include_in_schema=False)
@@ -87,5 +97,50 @@ def device_approve(request: Request, principal: PagePrincipal, db: Db, at: Now, 
 
 
 @router.get("/", response_class=HTMLResponse)
-def home(request: Request, principal: PagePrincipal) -> HTMLResponse:
-    return render(request, "index.html", principal)
+def home(request: Request, principal: PagePrincipal, db: Db) -> HTMLResponse:
+    rows = [
+        (p, len(p.failures), len(p.wins), len(lifecycle.unresolved_required(p)))
+        for p in projects.list_projects(db, principal.user.id)
+    ]
+    return render(request, "index.html", principal, rows=rows)
+
+
+@router.get("/projects/{name}", response_class=HTMLResponse)
+def project_page(request: Request, name: str, principal: PagePrincipal, db: Db) -> HTMLResponse:
+    project = projects.find_project(db, principal.user.id, name)
+    return render(
+        request,
+        "project.html",
+        principal,
+        project=project,
+        requirements=projects.latest_requirements(project),
+        failures=failures.search_failures(db, principal.user.id, project_id=project.id),
+        unresolved={i.id for i in lifecycle.unresolved_required(project)},
+    )
+
+
+@router.get("/failures", response_class=HTMLResponse)
+def failures_page(request: Request, principal: PagePrincipal, db: Db, q: str = "") -> HTMLResponse:
+    names = {p.id: p.name for p in projects.list_projects(db, principal.user.id)}
+    rows = failures.search_failures(db, principal.user.id, q or None)
+    return render(request, "failures.html", principal, rows=rows, names=names, q=q)
+
+
+@router.get("/rules", response_class=HTMLResponse)
+def rules_page(request: Request, principal: PagePrincipal, db: Db) -> HTMLResponse:
+    found = patterns.detect_patterns(db, principal.user.id)
+    db.commit()
+    suggestions = [
+        (p, patterns.draft_rule_text(patterns.pattern_failures(db, p))) for p in found if patterns.live_rule(db, p) is None
+    ]
+    labels = {p.id: p.label for p in found}
+    return render(
+        request, "rules.html", principal, suggestions=suggestions, rules=patterns.list_rules(db, principal.user.id), labels=labels
+    )
+
+
+@router.post("/rules")
+def approve_rule(principal: PagePrincipal, db: Db, pattern_id: uuid.UUID = Form(), checklist_text: str = Form()):
+    patterns.approve_rule(db, patterns.get_pattern(db, principal.user.id, pattern_id), checklist_text)
+    db.commit()
+    return RedirectResponse("/rules", status_code=303)
