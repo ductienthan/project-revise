@@ -25,6 +25,23 @@
 <p class="muted">No checklist yet. Run <code>preflight {{ project.name }} start</code>.</p>
 {% endif %}
 
+<h2>Links</h2>
+{% if project.links %}
+<table>
+  <thead><tr><th>Link</th><th>Type</th><th>Note</th><th>Snapshots</th></tr></thead>
+  <tbody>
+  {% for l in project.links %}
+    <tr>
+      <td>{{ l.title or l.url }}</td>
+      <td>{{ l.type }}{% if l.sensitive %} <span class="tag">sensitive</span>{% endif %}</td>
+      <td class="muted">{{ l.note }}</td>
+      <td>{% for s in l.snapshots %}<a href="/snapshots/{{ s.id }}">v{{ s.version }}</a>{% if s.approved %} ✓{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="muted">No links.</p>{% endif %}
+
 <h2>Failures</h2>
 {% include "_failures.html" %}
 

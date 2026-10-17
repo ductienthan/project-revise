@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     ai_monthly_budget_usd: float = 5.0
     api_url: str = "http://localhost:8000"
 
+    capture_allow_private: bool = False
     require_https: bool = False
     session_idle_minutes: int = 60 * 12
     access_token_minutes: int = 60

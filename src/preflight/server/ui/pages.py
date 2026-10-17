@@ -6,7 +6,8 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from preflight.core import failures, lifecycle, patterns, projects
+from preflight.core import failures, lifecycle, links, patterns, projects
+from preflight.db.models import Project
 from preflight.server.auth import service
 from preflight.server.deps import (
     LOGIN_CSRF_COOKIE,
@@ -121,6 +122,35 @@ def project_page(request: Request, name: str, principal: PagePrincipal, db: Db) 
         failures=failures.search_failures(db, principal.user.id, project_id=project.id),
         unresolved={i.id for i in lifecycle.unresolved_required(project)},
     )
+
+
+@router.get("/snapshots/{snapshot_id}", response_class=HTMLResponse)
+def snapshot_page(request: Request, snapshot_id: uuid.UUID, principal: PagePrincipal, db: Db) -> HTMLResponse:
+    snapshot = links.get_snapshot(db, principal.user.id, snapshot_id)
+    link = links.get_link(db, principal.user.id, snapshot.link_id)
+    return render(request, "snapshot.html", principal, snapshot=snapshot, link=link)
+
+
+@router.post("/snapshots/{snapshot_id}")
+def snapshot_action(
+    snapshot_id: uuid.UUID, principal: PagePrincipal, db: Db, action: str = Form(), content: str = Form("")
+):
+    snapshot = links.get_snapshot(db, principal.user.id, snapshot_id)
+    link = links.get_link(db, principal.user.id, snapshot.link_id)
+    project = db.get(Project, link.project_id)
+    match action:
+        case "delete":
+            db.delete(snapshot)
+            db.commit()
+            return RedirectResponse(f"/projects/{project.name}", status_code=303)
+        case "save":
+            snapshot.content, snapshot.approved = content, True
+        case "approve":
+            snapshot.approved = True
+        case "unapprove":
+            snapshot.approved = False
+    db.commit()
+    return RedirectResponse(f"/snapshots/{snapshot.id}", status_code=303)
 
 
 @router.get("/failures", response_class=HTMLResponse)

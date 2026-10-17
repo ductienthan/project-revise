@@ -44,3 +44,22 @@ def test_user_text_is_escaped(web):
     new_project(web, "billing")
     fail(web, "billing", "<script>alert(1)</script>")
     assert "<script>alert(1)</script>" not in web.get("/failures").text
+
+
+def test_snapshot_page_previews_edits_approves_and_deletes(app, web):
+    from tests.test_links import Web
+
+    fake = Web()
+    app.state.fetcher = fake.fetcher()
+    new_project(web, "gateway")
+    snapshot = web.post("/api/v1/projects/gateway/links", json={"url": "https://docs.example.com/rate-limits", "capture": True}).json()["snapshot"]
+    page = web.get(f"/snapshots/{snapshot['id']}").text
+    assert "## Tiers" in page and "Approve as is" in page
+    token = csrf(page)
+    no_header = {"X-CSRF-Token": ""}
+    web.post(f"/snapshots/{snapshot['id']}", data={"action": "save", "content": "# Trimmed", "csrf_token": token}, headers=no_header)
+    saved = web.get(f"/api/v1/snapshots/{snapshot['id']}").json()
+    assert saved["content"] == "# Trimmed" and saved["approved"]
+    assert "Links" in web.get("/projects/gateway").text
+    web.post(f"/snapshots/{snapshot['id']}", data={"action": "delete", "csrf_token": token}, headers=no_header)
+    assert web.get(f"/api/v1/snapshots/{snapshot['id']}").status_code == 404

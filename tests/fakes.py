@@ -88,3 +88,33 @@ class FakeAnthropic:
 
     def close(self):
         self.server.shutdown()
+
+
+class FixtureSite:
+    """A local website for capture checks: path -> (status, headers, body)."""
+
+    def __init__(self, pages: dict[str, tuple[int, dict, str]]):
+        self.hits: list[str] = []
+        site = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_GET(self):
+                site.hits.append(self.path)
+                status, headers, body = pages.get(self.path, (404, {}, "not found"))
+                data = body.encode()
+                self.send_response(status)
+                for key, value in {"content-type": "text/html; charset=utf-8", **headers}.items():
+                    self.send_header(key, value)
+                self.send_header("content-length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.server.shutdown()

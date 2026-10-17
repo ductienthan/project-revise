@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Snapshot · Preflight{% endblock %}
+{% block content %}
+<h1>{{ link.title or link.url }} <span class="tag">v{{ snapshot.version }}</span>{% if snapshot.approved %} <span class="tag">approved for reviews</span>{% endif %}</h1>
+<p class="muted"><a href="{{ link.url }}" rel="noreferrer noopener">{{ link.url }}</a>. Captured {{ snapshot.captured_at.strftime("%Y-%m-%d %H:%M") }}{% if snapshot.truncated %}, truncated at 200 KB{% endif %}.</p>
+<form method="post" action="/snapshots/{{ snapshot.id }}" class="stack wide">
+  <input type="hidden" name="csrf_token" value="{{ csrf }}">
+  <label>Text <textarea name="content" rows="24">{{ snapshot.content }}</textarea></label>
+  <div class="row">
+    <button name="action" value="save">Save and approve</button>
+    {% if snapshot.approved %}<button name="action" value="unapprove">Stop using in reviews</button>{% else %}<button name="action" value="approve">Approve as is</button>{% endif %}
+    <button name="action" value="delete" class="danger">Delete snapshot</button>
+  </div>
+</form>
+{% endblock %}

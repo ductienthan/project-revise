@@ -305,6 +305,72 @@ def win(text: str, tag: str | None) -> None:
     click.echo("Logged win.")
 
 
+def _review_snapshot(client: Client, captured: dict, no_input: bool) -> None:
+    if captured.get("capture_error"):
+        click.echo(f"Not captured: {captured['capture_error']}")
+        return
+    snapshot = captured.get("snapshot")
+    if snapshot is None:
+        return
+    title = captured["link"]["title"] or captured["link"]["url"]
+    flag = " (truncated)" if snapshot["truncated"] else ""
+    click.echo(f'Captured: "{title}" v{snapshot["version"]} ({snapshot["words"]:,} words){flag}.')
+    if no_input:
+        click.echo("Not yet approved for reviews.")
+        return
+    if click.confirm("Preview?", default=True):
+        lines = snapshot["content"].splitlines()
+        click.echo("\n".join(lines[:30]) + ("\n..." if len(lines) > 30 else ""))
+    if click.confirm("Use this snapshot in reviews?", default=False):
+        client.patch(f"/snapshots/{snapshot['id']}", json={"approved": True})
+        click.echo("Approved for reviews.")
+
+
+@project.command("add-link")
+@click.argument("url")
+@click.option("--internal", is_flag=True, help="A reference only. Never fetched.")
+@click.option("--capture", "do_capture", is_flag=True, help="Capture a public page as a text snapshot.")
+@click.option("--note", default="")
+@click.option("--title", default="")
+@click.option("--sensitive", is_flag=True, help="Never offer this link to AI.")
+@click.option("--no-input", is_flag=True)
+def add_link(url: str, internal: bool, do_capture: bool, note: str, title: str, sensitive: bool, no_input: bool) -> None:
+    """Save a link, and optionally capture a public page."""
+    name, client = _ctx()
+    body = {"url": url, "title": title, "note": note, "internal": internal, "sensitive": sensitive, "capture": do_capture}
+    captured = client.post(f"/projects/{name}/links", json=body)
+    click.echo(f"Saved {'internal' if internal else 'public'} link {captured['link']['id'][:8]}.")
+    _review_snapshot(client, captured, no_input)
+
+
+@project.command()
+def links() -> None:
+    """List links and snapshots."""
+    name, client = _ctx()
+    rows = client.get(f"/projects/{name}/links")
+    if not rows:
+        click.echo("No links yet.")
+        return
+    table = Table("id", "type", "link", "note", "snapshots")
+    for link in rows:
+        snaps = ", ".join(f"v{s['version']}{' approved' if s['approved'] else ''}" for s in link["snapshots"])
+        kind = link["type"] + (", sensitive" if link["sensitive"] else "")
+        table.add_row(link["id"][:8], kind, link["title"] or link["url"], link["note"], snaps or "none")
+    console.print(table)
+
+
+@project.command()
+@click.argument("link_id")
+@click.option("--no-input", is_flag=True)
+def refresh(link_id: str, no_input: bool) -> None:
+    """Re-capture a public link. Old snapshots are kept."""
+    name, client = _ctx()
+    matches = [link for link in client.get(f"/projects/{name}/links") if link["id"].startswith(link_id)]
+    if len(matches) != 1:
+        raise click.ClickException(f"No single link matches '{link_id}'.")
+    _review_snapshot(client, client.post(f"/links/{matches[0]['id']}/refresh"), no_input)
+
+
 @project.command()
 def status() -> None:
     """Show progress for the project."""

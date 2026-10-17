@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from preflight.ai.client import AIClient, AnthropicClient
 from preflight.ai.gate import AIUnavailable
+from preflight.capture.fetch import Fetcher
 from preflight.config import Settings
 from preflight.core.errors import DomainError, NotFound
 from preflight.db.base import utcnow
@@ -36,6 +37,7 @@ def create_app(
     app.state.settings = settings
     app.state.clock = clock
     app.state.ai = ai
+    app.state.fetcher = Fetcher(allow_private=settings.capture_allow_private)
     app.state.engine = make_engine(settings.database_url)
     app.state.sessionmaker = make_sessionmaker(app.state.engine)
     app.state.rate_limiter = RateLimiter(settings.rate_limit_per_minute)

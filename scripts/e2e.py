@@ -3,6 +3,7 @@
 Run with `uv run python scripts/e2e.py`. Exits non-zero on the first failed check.
 """
 
+import json
 import os
 import re
 import socket
@@ -17,7 +18,8 @@ import httpx
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from tests.fakes import FakeAnthropic
+from tests.fakes import FakeAnthropic, FixtureSite
+from tests.test_links import ARTICLE, JS_SHELL
 
 PASSWORD = "e2e correct horse battery"
 TIMEOUT_CHECK = "Every external call has a timeout, retry cap, and backoff"
@@ -45,6 +47,7 @@ class Run:
             "COLUMNS": "250",
             "PREFLIGHT_ANTHROPIC_API_KEY": "sk-e2e-fake",
             "PREFLIGHT_ANTHROPIC_BASE_URL": anthropic.url,
+            "PREFLIGHT_CAPTURE_ALLOW_PRIVATE": "true",
             "PREFLIGHT_CONFIG_DIR": str(workdir / "laptop"),
         }
         self.workdir = workdir
@@ -69,6 +72,10 @@ class Run:
 
     def cli(self, *args: str, **kwargs) -> str:
         return self.sh("preflight", *args, **kwargs)
+
+    def bearer(self) -> dict:
+        tokens = json.loads((Path(self.env["PREFLIGHT_CONFIG_DIR"]) / "credentials.json").read_text())[self.base]
+        return {"Authorization": f"Bearer {tokens['access_token']}"}
 
     def start_server(self) -> None:
         self.server = subprocess.Popen(
@@ -229,6 +236,7 @@ def scenario(run: Run) -> None:
     out = run.cli("next-thing", "start", "--override", "spike, accept the risk")
     run.ok("Gate overridden" in out, "the gate can be overridden with a typed reason")
 
+    capture_links(run)
     ai_review(run)
 
     home = web.get("/")
@@ -244,6 +252,42 @@ def scenario(run: Run) -> None:
     run.ok("Run `preflight login`" in out, "a revoked device is locked out")
     run.ok("is started" in run.cli("llm-gateway", "status"), "other devices keep working after a revoke")
     run.ok(web.get("/").status_code == 200, "the dashboard session survives a device revoke")
+
+
+def capture_links(run: Run) -> None:
+    site = FixtureSite({
+        "/robots.txt": (200, {"content-type": "text/plain"}, "User-agent: *\nDisallow: /private/\n"),
+        "/rate-limits": (200, {}, ARTICLE),
+        "/private/plan": (200, {}, ARTICLE),
+        "/wiki": (302, {"location": "/login?next=/wiki"}, ""),
+        "/app": (200, {}, JS_SHELL),
+    })
+    try:
+        run.cli("new", "links-demo", "--no-input")
+        out = run.cli("links-demo", "add-link", f"{site.url}/rate-limits", "--capture", "--note", "limits per key", input="y\ny\n")
+        run.ok('Captured: "Rate limits" v1' in out and "## Tiers" in out and "Approved for reviews." in out,
+               "public page captured, previewed and approved", out)
+        out = run.cli("links-demo", "add-link", "https://wiki.example-corp.invalid/spec", "--internal", "--capture",
+                      "--note", "Latency target 800ms p95", "--no-input")
+        run.ok("Saved internal link" in out and "Captured" not in out, "internal link saved as a reference without fetching")
+        out = run.cli("links-demo", "add-link", f"{site.url}/wiki", "--capture", "--no-input")
+        run.ok("Not captured: This page needs a login" in out, "a login redirect is detected and skipped", out)
+        out = run.cli("links-demo", "add-link", f"{site.url}/private/plan", "--capture", "--no-input")
+        run.ok("robots rules do not allow" in out and "/private/plan" not in site.hits, "robots rules are respected")
+        out = run.cli("links-demo", "add-link", f"{site.url}/app", "--capture", "--no-input")
+        run.ok("preflight[browser]" in out, "a JavaScript-only page points to the browser extra", out)
+        listing = run.cli("links-demo", "links")
+        match = re.search(r"([0-9a-f]{8})\s*│\s*public\s*│\s*Rate limits", listing)
+        run.ok(match is not None, "links list shows the captured link", listing)
+        link_id = match.group(1)
+        run.ok("v1 approved" in listing and "Latency target 800ms p95" in listing, "links list shows types, notes and snapshots", listing)
+        out = run.cli("links-demo", "refresh", link_id, "--no-input")
+        run.ok("v2" in out and "v1 approved, v2" in run.cli("links-demo", "links"), "refresh adds v2 and keeps v1")
+        items = httpx.get(f"{run.base}/api/v1/projects/links-demo/review-items", headers=run.bearer()).json()["items"]
+        labels = [i["label"] for i in items]
+        run.ok(any(label.startswith("Snapshot: Rate limits v1") for label in labels), "only the approved snapshot version is offered to AI", str(labels))
+    finally:
+        site.close()
 
 
 def ai_review(run: Run) -> None:
