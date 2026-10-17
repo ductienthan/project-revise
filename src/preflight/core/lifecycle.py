@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 from sqlalchemy.orm import Session
 
-from preflight.core import review
+from preflight.core import drills, review
 from preflight.core.checklist import build_checklist
 from preflight.core.errors import DomainError
 from preflight.db.models import (
@@ -107,4 +107,5 @@ def close(
     project.retrospectives.append(retrospective)
     transition(project, ProjectStatus.CLOSED, at)
     db.flush()
+    drills.create_missing(db, project.user_id, at.date())
     return retrospective

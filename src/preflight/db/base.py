@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, TypeDecorator, Uuid
+from sqlalchemy import DateTime, Enum, ForeignKey, MetaData, TypeDecorator, Uuid
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -11,7 +11,8 @@ def utcnow() -> datetime:
 
 
 class UTCDateTime(TypeDecorator):
-    """SQLite drops tzinfo on read, so reattach UTC to keep comparisons with aware datetimes valid."""
+    """Always UTC on the way out. SQLite drops tzinfo, and Postgres returns the session's zone, where adding
+    days crosses DST boundaries by wall clock and shifts results by an hour."""
 
     impl = DateTime(timezone=True)
     cache_ok = True
@@ -22,9 +23,9 @@ class UTCDateTime(TypeDecorator):
         return value
 
     def process_result_value(self, value, dialect):
-        if value is not None and value.tzinfo is None:
-            return value.replace(tzinfo=UTC)
-        return value
+        if value is None:
+            return None
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
 def str_enum(cls: type[enum.StrEnum]) -> Enum:
@@ -32,7 +33,14 @@ def str_enum(cls: type[enum.StrEnum]) -> Enum:
 
 
 class Base(DeclarativeBase):
-    pass
+    metadata = MetaData(
+        naming_convention={
+            "ix": "ix_%(column_0_label)s",
+            "uq": "uq_%(table_name)s_%(column_0_name)s",
+            "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+            "pk": "pk_%(table_name)s",
+        }
+    )
 
 
 class Owned:

@@ -312,7 +312,7 @@ class Rule(Owned, Base):
 class Drill(Owned, Base):
     __tablename__ = "drills"
 
-    failure_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("failures.id", ondelete="CASCADE"), index=True)
+    failure_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("failures.id", ondelete="CASCADE"), unique=True)
     prompt: Mapped[str] = mapped_column(Text)
     answer: Mapped[str] = mapped_column(Text)
     ease: Mapped[float] = mapped_column(Float, default=2.5)

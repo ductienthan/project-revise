@@ -138,6 +138,31 @@ def set_rule(rule_id: str, status: str | None, text: str | None) -> None:
 
 
 @cli.command()
+@click.option("--ai", "use_ai", is_flag=True, help="Have AI grade typed answers. Asks before sending each one.")
+def drill(use_ai: bool) -> None:
+    """Review today's due drills."""
+    client = Client()
+    due = client.get("/drills/today")
+    if not due:
+        click.echo("No drills due today.")
+        return
+    click.echo(f"{len(due)} drill(s) due.")
+    for n, d in enumerate(due, start=1):
+        click.echo(f"\n{n}. {d['prompt']}")
+        attempt = click.prompt("Your answer (Enter to just reveal)", default="", show_default=False)
+        click.echo(f"Expected: {d['answer']}")
+        body: dict = {"attempt": attempt}
+        if use_ai and attempt and click.confirm("Send this drill and your answer to AI for grading?", default=False):
+            body["grade_with_ai"] = True
+        else:
+            body["score"] = click.prompt("Score 0 (forgot) to 5 (perfect)", type=click.IntRange(0, 5))
+        result = client.post(f"/drills/{d['id']}/review", json=body)
+        if result["feedback"]:
+            click.echo(f"Score {result['score']}: {result['feedback']}")
+        click.echo(f"Next review in {result['interval_days']} day(s).")
+
+
+@cli.command()
 @click.option("--week", is_flag=True, help="Show the weekly report instead of overall progress.")
 def report(week: bool) -> None:
     """Show progress, or the weekly report."""

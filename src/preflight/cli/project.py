@@ -404,6 +404,51 @@ def close(summary: str | None) -> None:
 
 
 @project.command()
+@click.argument("hypothesis")
+@click.option("--evidence", default="", help="What you will look at to check it.")
+@click.option("--confidence", type=click.IntRange(0, 100), help="How sure you are, 0 to 100.")
+def predict(hypothesis: str, evidence: str, confidence: int | None) -> None:
+    """Record a hypothesis and your confidence before debugging."""
+    name, client = _ctx()
+    if confidence is None:
+        confidence = click.prompt("Confidence (0-100)", type=click.IntRange(0, 100))
+    p = client.post(f"/projects/{name}/predictions", json={"hypothesis": hypothesis, "evidence_planned": evidence, "confidence": confidence})
+    click.echo(f"Prediction {p['id'][:8]} recorded at {confidence}%. Close it with `preflight {name} resolve {p['id'][:8]} right|wrong`.")
+
+
+@project.command()
+def predictions() -> None:
+    """List predictions and their outcomes."""
+    name, client = _ctx()
+    rows = client.get(f"/projects/{name}/predictions")
+    table = Table("id", "hypothesis", "confidence", "outcome")
+    for p in rows:
+        outcome = "open" if p["correct"] is None else ("right" if p["correct"] else "wrong")
+        table.add_row(p["id"][:8], p["hypothesis"], f"{p['confidence']}%", outcome)
+    console.print(table if rows else "No predictions yet.")
+
+
+@project.command()
+@click.argument("prediction_id")
+@click.argument("outcome", type=click.Choice(["right", "wrong"]))
+@click.option("--failure", "failure_id", help="The failure this prediction was about (id prefix).")
+def resolve(prediction_id: str, outcome: str, failure_id: str | None) -> None:
+    """Close a prediction with what actually happened."""
+    name, client = _ctx()
+    matches = [p for p in client.get(f"/projects/{name}/predictions") if p["id"].startswith(prediction_id)]
+    if len(matches) != 1:
+        raise click.ClickException(f"No single prediction matches '{prediction_id}'.")
+    body = {"correct": outcome == "right"}
+    if failure_id:
+        found = [f for f in client.get(f"/projects/{name}/failures") if f["id"].startswith(failure_id)]
+        if len(found) != 1:
+            raise click.ClickException(f"No single failure matches '{failure_id}'.")
+        body["failure_id"] = found[0]["id"]
+    client.post(f"/predictions/{matches[0]['id']}/close", json=body)
+    click.echo(f"Prediction closed as {outcome}.")
+
+
+@project.command()
 def status() -> None:
     """Show progress for the project."""
     name, client = _ctx()

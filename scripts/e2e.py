@@ -239,6 +239,7 @@ def scenario(run: Run) -> None:
     capture_links(run)
     ai_review(run)
     close_and_report(run, web)
+    practice(run)
 
     home = web.get("/")
     run.ok(home.status_code == 200 and 'href="/projects/llm-gateway"' in home.text, "dashboard lists projects")
@@ -325,6 +326,26 @@ def close_and_report(run: Run, web: httpx.Client) -> None:
     page = web.get("/progress")
     run.ok(page.status_code == 200 and "Rule scoreboard" in page.text and "Rule: shared-state-safety" in page.text, "dashboard progress page shows the rule scoreboard")
     run.ok("Weekly report" in web.get("/weekly").text, "dashboard weekly page loads")
+
+
+def practice(run: Run) -> None:
+    run.cli("new", "old-work", "--no-input")
+    run.cli("old-work", "start", "--no-input", "--override", "backfill")
+    run.cli("old-work", "fail", "Retry storm", "--date", "2026-09-01", "--cause", "no jitter", "--prevention", "Retries use jitter", "--no-input")
+    run.cli("old-work", "fail", "Deadlock", "--date", "2026-09-02", "--cause", "lock order", "--prevention", "One lock order", "--no-input")
+    run.cli("old-work", "close", "--summary", "Backfilled history.", input="\n" * 40)
+    out = run.cli("drill", "--ai", input="jitter was missing\nn\n4\nlocks taken in two orders\ny\n")
+    run.ok("2 drill(s) due." in out and 'In old-work: "Retry storm".' in out and "Expected: Root cause: no jitter. Check: Retries use jitter" in out,
+           "closing a project creates drills from its failures", out)
+    run.ok("Score 4: Right cause" in out and out.count("Next review in 1 day(s).") == 2, "drills are self-scored or AI-graded and rescheduled", out)
+    run.ok(run.anthropic.requests[-1]["body"]["model"] == "claude-haiku-5-5", "drill grading uses the cheaper model")
+    run.ok("No drills due today." in run.cli("drill"), "reviewed drills are not due again today")
+
+    out = run.cli("next-thing", "predict", "The cache TTL is ignored", "--evidence", "cache logs", "--confidence", "80")
+    prediction = re.search(r"Prediction ([0-9a-f]{8})", out).group(1)
+    run.cli("next-thing", "resolve", prediction, "wrong")
+    run.ok("wrong" in run.cli("next-thing", "predictions"), "a prediction is recorded and closed")
+    run.ok("Calibration gap: +80% over 1 predictions" in run.cli("report"), "calibration shows in the report")
 
 
 def ai_review(run: Run) -> None:

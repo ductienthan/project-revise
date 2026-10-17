@@ -112,3 +112,15 @@ def test_rule_verdicts():
 
 def test_trends_need_three_points():
     assert not metrics.enough_for_trend(2) and metrics.enough_for_trend(3)
+
+
+def test_stored_times_come_back_in_utc_so_day_arithmetic_ignores_dst():
+    from zoneinfo import ZoneInfo
+
+    from preflight.db.base import UTCDateTime
+
+    pacific = datetime(2026, 10, 30, 2, tzinfo=ZoneInfo("America/Los_Angeles"))
+    loaded = UTCDateTime().process_result_value(pacific, None)
+    assert loaded.tzinfo == UTC
+    assert loaded + timedelta(days=28) - loaded == timedelta(hours=28 * 24)
+    assert (loaded + timedelta(days=28)).hour == 9, "Nov 27 09:00 UTC, not shifted by the DST change"
