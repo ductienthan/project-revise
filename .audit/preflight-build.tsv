@@ -1,0 +1,3 @@
+ts	phase	decision	why	evidence	result
+2026-10-17T22:54:09Z	frame	scoped this run to build phases 1-3 with a fake AI client	operator picked phases 1-3 first and has no API key for tests	AskUserQuestion answer	open
+2026-10-17T22:54:09Z	frame	done = pytest green plus scripts/e2e.py driving the real CLI and server through login, capture and the checklist gate	check the real product, not just unit tests	scripts/e2e.py	open
