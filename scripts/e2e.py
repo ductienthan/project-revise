@@ -33,7 +33,7 @@ class Run:
         self.base = f"http://127.0.0.1:{self.port}"
         self.env = {
             **os.environ,
-            "PREFLIGHT_DATABASE_URL": f"sqlite:///{workdir / 'e2e.db'}",
+            "PREFLIGHT_DATABASE_URL": os.environ.get("PREFLIGHT_E2E_DATABASE_URL", f"sqlite:///{workdir / 'e2e.db'}"),
             "PREFLIGHT_DEVICE_POLL_SECONDS": "1",
             "PREFLIGHT_API_URL": self.base,
             "PREFLIGHT_NO_KEYRING": "1",
@@ -97,7 +97,8 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         run = Run(Path(tmp))
         run.sh("alembic", "upgrade", "head")
-        run.ok((Path(tmp) / "e2e.db").exists(), "alembic migration created the database")
+        tables = run.sh("python", "-c", "from preflight.config import Settings; from sqlalchemy import create_engine, inspect; print(sorted(inspect(create_engine(Settings().database_url)).get_table_names()))")
+        run.ok("'checklist_items'" in tables and "'users'" in tables, "alembic migration created the schema", tables)
         out = run.sh("preflight-server", "create-user", "--username", "me", env={"PREFLIGHT_ADMIN_PASSWORD": PASSWORD})
         run.ok("created user me" in out, "admin command created the dashboard account")
 

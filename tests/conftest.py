@@ -1,3 +1,4 @@
+import os
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -27,9 +28,13 @@ def clock() -> Clock:
     return Clock()
 
 
+TEST_DATABASE_URL = os.environ.get("PREFLIGHT_TEST_DATABASE_URL", "sqlite://")
+
+
 @pytest.fixture
 def app(clock):
-    app = create_app(Settings(database_url="sqlite://", rate_limit_per_minute=1000, _env_file=None), clock=clock)
+    app = create_app(Settings(database_url=TEST_DATABASE_URL, rate_limit_per_minute=1000, _env_file=None), clock=clock)
+    Base.metadata.drop_all(app.state.engine)
     Base.metadata.create_all(app.state.engine)
     with app.state.sessionmaker() as db:
         service.create_user(db, "me", PASSWORD)
