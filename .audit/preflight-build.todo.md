@@ -14,3 +14,15 @@
   - [ ] Independent review of auth and gate (subagent)
 - [x] Phase D: Keep the audit trail (.audit/preflight-build.tsv, a row per landed step)
 - [x] Phase E: Verify the whole against the predicate and hand back
+
+# Phases 4-7 (second turn)
+
+- [x] P4 AI review gate, verified by tests and e2e against a fake Messages API
+- [x] P5 links and capture, verified by tests and e2e against a local site
+- [x] P6 retrospective, metrics, verdicts, reports, export, progress page (rendered and looked at)
+- [x] P7 drills, predictions, calibration
+- [x] Independent review of phases 4-7, findings fixed with failing-first tests
+- [x] Final predicate: check.sh green on SQLite and Postgres
+- [ ] Deploy to Render + Neon. skip: needs the operator's accounts, and deploys always pause for the operator
+- [ ] Real Claude API call. skip: no API key provided; wire format verified against a fake server only
+- [ ] Playwright fallback. skip: not installed; off by default
