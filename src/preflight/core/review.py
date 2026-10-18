@@ -47,9 +47,14 @@ class ReviewMaterial:
 def _history(db: Session, project: Project, requirement_words: frozenset[str]) -> tuple[str, dict]:
     failures = list(db.scalars(select(Failure).where(Failure.user_id == project.user_id, Failure.project_id != project.id)))
     failures.sort(
-        key=lambda f: (f.severity != Severity.HIGH, -overlap(requirement_words, keywords(f"{f.title} {f.prevention}")), -f.minutes_lost)
+        key=lambda f: (
+            f.severity != Severity.HIGH, -overlap(requirement_words, keywords(f"{f.title} {f.prevention}")), -f.minutes_lost,
+            f.occurred_at, str(f.id),
+        )
     )
-    rules = db.scalars(select(Rule).where(Rule.user_id == project.user_id, Rule.status != RuleStatus.RETIRED))
+    rules = db.scalars(
+        select(Rule).where(Rule.user_id == project.user_id, Rule.status != RuleStatus.RETIRED).order_by(Rule.created_at, Rule.id)
+    )
     lines, refs = [], {}
     for f in failures[:MAX_HISTORY_FAILURES]:
         ref = f"F:{short_id(f.id)}"
@@ -108,7 +113,23 @@ def latest_review(db: Session, project: Project, completed: bool = False) -> Rev
 
 
 SPLITTABLE = ("requirements", "snapshot")
-CITATION = re.compile(r"\b(?:F|R|L|S):[0-9a-f]{8}\b|\bREQ:\d+\b")
+REQ_LINE = re.compile(r"^(REQ:\d+) ", re.MULTILINE)
+
+
+def allowed_refs(batch: list[GateItem], refs: dict) -> set[str]:
+    """References a call could legitimately cite, read from the batch's structure, never from free text."""
+    allowed: set[str] = set()
+    for item in batch:
+        base = item.id.split("#")[0]
+        if item.kind == "history":
+            allowed |= {r for r in refs if r.startswith(("F:", "R:"))}
+        elif item.kind == "requirements":
+            allowed |= set(REQ_LINE.findall(item.text))
+        elif item.kind == "link_note":
+            allowed.add(f"L:{short_id(base.split(':', 1)[1])}")
+        elif item.kind == "snapshot" and item.ref:
+            allowed.add(item.ref)
+    return allowed & set(refs)
 
 
 def plan_batches(items: list[GateItem], budget_tokens: int) -> list[list[GateItem]]:
@@ -120,9 +141,7 @@ def plan_batches(items: list[GateItem], budget_tokens: int) -> list[list[GateIte
     fixed = [i for i in items if i.kind not in SPLITTABLE]
     room = budget_tokens - sum(i.tokens for i in fixed)
     documents = [i for i in items if i.kind in SPLITTABLE]
-    if not documents:
-        return [fixed]
-    if room < 500:
+    if room < (500 if documents else 0):
         raise DomainError("The history and notes alone fill the model's context. Approve fewer items or raise the context size.")
     pieces: list[GateItem] = []
     for doc in documents:
@@ -137,7 +156,8 @@ def plan_batches(items: list[GateItem], budget_tokens: int) -> list[list[GateIte
 
 def _split(doc: GateItem, room: int) -> list[GateItem]:
     header = f"{doc.ref} (continued)\n" if doc.ref else ""
-    limit = (room - len(header) // gate.CHARS_PER_TOKEN - 1) * gate.CHARS_PER_TOKEN
+    wrapper = GateItem(f"{doc.id}#9999", doc.kind, f"{doc.label}, part 9999 of 9999", header).tokens
+    limit = (room - wrapper - 1) * gate.CHARS_PER_TOKEN
     parts, current = [], ""
     for line in doc.text.splitlines(keepends=True):
         while len(line) > limit:
@@ -176,12 +196,12 @@ def run_review(
         output, call = gate.run(db, ai, settings, project.user_id, REVIEW, batch, {i.id for i in batch}, at)
         assert isinstance(output, ReviewOutput)
         call_ids.append(str(call.id))
-        seen = set(CITATION.findall("\n".join(i.text for i in batch)))
+        seen = allowed_refs(batch, found.refs)
         for q in output.questions:
             questions.setdefault(" ".join(q.question.lower().split()), (q.category, q.question))
         for kind, entries in (("gap", output.gaps), ("item", output.checklist_items)):
             for entry in entries:
-                if entry.source_ref not in seen or entry.source_ref not in found.refs:
+                if entry.source_ref not in seen:
                     dropped += 1
                     continue
                 drafts.append({"kind": kind, "text": entry.text, "why": entry.why, "source_ref": entry.source_ref,

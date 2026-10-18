@@ -44,6 +44,7 @@ def downgrade() -> None:
             bind.execute(reviews.update().where(reviews.c.id == review_id).values(ai_call_id=uuid.UUID(call_ids[0])))
 
     with op.batch_alter_table("reviews", schema=None) as batch_op:
+        batch_op.alter_column("ai_call_id", existing_type=sa.Uuid(), nullable=False)
         batch_op.create_foreign_key("fk_reviews_ai_call_id", "ai_calls", ["ai_call_id"], ["id"])
         batch_op.drop_column("ai_call_ids")
         batch_op.drop_column("material_hash")

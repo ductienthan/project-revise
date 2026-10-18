@@ -4,7 +4,7 @@ import pytest
 
 from preflight.ai.gate import GateItem
 from preflight.core.errors import DomainError
-from preflight.core.review import CITATION, plan_batches
+from preflight.core.review import REQ_LINE, plan_batches
 from preflight.db.models import AiCall
 from tests.test_capture import fail, new_project
 
@@ -26,7 +26,7 @@ def test_long_documents_split_on_lines_and_every_call_keeps_the_context():
     assert len(batches) > 1
     assert all(b[0].id == "history" for b in batches), "history rides in every call"
     assert all(sum(i.tokens for i in b) <= 3_000 for b in batches)
-    seen = [ref for b in batches for i in b[1:] for ref in CITATION.findall(i.text)]
+    seen = [ref for b in batches for i in b[1:] for ref in REQ_LINE.findall(i.text)]
     assert seen == [f"REQ:{n}" for n in range(1, 401)], "every line is sent exactly once, in order, with its tag"
     assert batches[1][1].label == f"Requirements v1 (400 lines), part 2 of {len(batches)}"
 

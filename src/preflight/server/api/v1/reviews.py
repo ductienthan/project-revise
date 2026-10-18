@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from preflight.ai import gate
 from preflight.ai.prompts.review import REVIEW
 from preflight.core import assist, failures, patterns, review
+from preflight.core.errors import DomainError
 from preflight.db.models import AiCall, QuestionStatus, Review
 from preflight.server.api.v1.projects import ProjectRef
 from preflight.server.deps import AppSettings, CurrentPrincipal, Db, Now
@@ -29,6 +30,7 @@ class ReviewItemsOut(BaseModel):
     model: str | None
     max_cost_usd: float
     calls: int
+    warning: str | None = None
     reviewed: bool
     review_current: bool
     requirements_version: int | None
@@ -96,7 +98,11 @@ def review_items(request: Request, project: ProjectRef, db: Db) -> ReviewItemsOu
     offered = gate.offerable(found.items)
     ai = _ai(request)
     ready = ai is not None and ai.available()
-    batches = review.plan_batches(offered, gate.input_budget(ai, REVIEW)) if ready and offered else []
+    warning = None
+    try:
+        batches = review.plan_batches(offered, gate.input_budget(ai, REVIEW)) if ready and offered else []
+    except DomainError as err:
+        batches, warning = [], str(err)
     estimates = [gate.estimate(ai, REVIEW, batch) for batch in batches]
     last = review.latest_review(db, project, completed=True)
     current = review.latest_requirements(project)
@@ -108,6 +114,7 @@ def review_items(request: Request, project: ProjectRef, db: Db) -> ReviewItemsOu
         model=ai.model_for(REVIEW.role) if ready else None,
         max_cost_usd=round(sum(e.max_cost_usd for e in estimates), 4),
         calls=len(batches),
+        warning=warning,
         reviewed=last is not None,
         review_current=last is not None and last.material_hash == review.material_hash(found),
         requirements_version=current.version if current else None,

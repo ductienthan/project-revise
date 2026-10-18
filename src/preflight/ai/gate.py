@@ -4,7 +4,7 @@ import json
 import threading
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import func, select
@@ -15,7 +15,7 @@ from preflight.ai.prompts import Prompt
 from preflight.ai.schemas import strict_schema
 from preflight.config import Settings
 from preflight.core.errors import DomainError
-from preflight.db.models import AiCall, User
+from preflight.db.models import AiCall, Review, User
 
 CHARS_PER_TOKEN = 4
 
@@ -32,7 +32,8 @@ class GateItem:
 
     @property
     def tokens(self) -> int:
-        return len(self.text) // CHARS_PER_TOKEN + 1
+        wrapper = 2 * len(self.kind) + len(self.id) + len(self.label) + 20
+        return (len(self.text) + wrapper) // CHARS_PER_TOKEN + 1
 
 
 @dataclass(frozen=True)
@@ -108,7 +109,15 @@ def run(
     if not payload:
         raise DomainError("Nothing was approved, so nothing was sent.")
     try:
-        call = _reserve(db, ai, settings, user_id, prompt, payload, approved_ids, at)
+        model = ai.model_for(prompt.role)
+    except AIError as err:
+        raise AIUnavailable(str(err)) from None
+    body = json.dumps({"system": prompt.system, "content": _content(payload)})
+    reused = _reuse(db, user_id, prompt, model, body, at)
+    if reused is not None:
+        return reused
+    try:
+        call = _reserve(db, ai, settings, user_id, prompt, payload, approved_ids, body, at)
     except AIError as err:
         raise AIUnavailable(str(err)) from None
     schema = strict_schema(prompt.output)
@@ -141,6 +150,33 @@ def run(
     raise AIUnavailable(call.error)
 
 
+REUSE_WINDOW = timedelta(hours=24)
+
+
+def _reuse(db: Session, user_id: uuid.UUID, prompt: Prompt, model: str, body: str, at: datetime) -> tuple[BaseModel, AiCall] | None:
+    """A good reply to the identical payload that no saved review used, from the last day.
+
+    Those are left behind when a later call in the same review fails, so retrying pays only for what failed, while a
+    deliberate re-review still gets fresh answers.
+    """
+    since = at - REUSE_WINDOW
+    used = {cid for ids in db.scalars(select(Review.ai_call_ids).where(Review.user_id == user_id, Review.created_at > since)) for cid in ids}
+    earlier = db.scalars(
+        select(AiCall).where(
+            AiCall.user_id == user_id, AiCall.kind == prompt.kind, AiCall.prompt_version == prompt.version,
+            AiCall.model == model, AiCall.payload == body, AiCall.error == "", AiCall.created_at > since,
+        ).order_by(AiCall.created_at.desc())
+    )
+    for call in earlier:
+        if str(call.id) in used:
+            continue
+        try:
+            return prompt.output.model_validate_json(call.response), call
+        except ValidationError:
+            continue
+    return None
+
+
 _reservation_lock = threading.Lock()
 
 
@@ -152,6 +188,7 @@ def _reserve(
     prompt: Prompt,
     payload: list[GateItem],
     approved_ids: set[str],
+    body: str,
     at: datetime,
 ) -> AiCall:
     """Log the exact payload and hold the call's worst-case cost before anything is sent.
@@ -175,7 +212,7 @@ def _reserve(
             prompt_version=prompt.version,
             model=worst.model,
             approved_items=sorted(approved_ids),
-            payload=json.dumps({"system": prompt.system, "content": _content(payload)}),
+            payload=body,
             cost_usd=worst.max_cost_usd,
         )
         db.add(call)

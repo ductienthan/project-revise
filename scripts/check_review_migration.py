@@ -47,6 +47,7 @@ def main() -> None:
     with engine.connect() as c:
         back = c.execute(sa.select(old.c.ai_call_id)).scalar_one()
     assert back == call, f"downgrade restored {back}"
+    assert not next(c for c in sa.inspect(engine).get_columns("reviews") if c["name"] == "ai_call_id")["nullable"], "NOT NULL restored"
     alembic("upgrade", "head")
     print("review migration keeps the AI call link in both directions")
 

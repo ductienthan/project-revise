@@ -30,10 +30,17 @@ def failure_id(project: str, title: str, day: str) -> str:
     return str(uuid.uuid5(NAMESPACE, f"{project}\0{title}\0{day}"))
 
 
+def _clean(value) -> str:
+    if value is None:
+        return ""
+    if not isinstance(value, str | int | float | bool):
+        raise TypeError(f"{value!r} is not a plain value")
+    return str(value).strip()
+
+
 def _parse_row(raw: dict) -> Row:
-    project = str(raw.get("project") or "").strip()
-    title = str(raw.get("title") or "").strip()
-    day = str(raw.get("date") or "").strip()
+    raw = {key: _clean(value) for key, value in raw.items() if key is not None}
+    project, title, day = raw.get("project", ""), raw.get("title", ""), raw.get("date", "")
     if not project or not title or not day:
         raise ValueError("needs project, title, and date")
     try:
@@ -43,7 +50,7 @@ def _parse_row(raw: dict) -> Row:
     body = {"id": failure_id(project, title, day), "title": title, "occurred_at": f"{day}T12:00:00Z"}
     for key in TEXT_FIELDS:
         if raw.get(key):
-            body[key] = str(raw[key]).strip()
+            body[key] = raw[key]
     if raw.get("category"):
         if raw["category"] not in CATEGORIES:
             raise ValueError(f"unknown category '{raw['category']}'")
@@ -52,16 +59,16 @@ def _parse_row(raw: dict) -> Row:
         if raw["severity"] not in SEVERITIES:
             raise ValueError(f"unknown severity '{raw['severity']}'")
         body["severity"] = raw["severity"]
-    if raw.get("minutes_lost") not in (None, ""):
+    if raw.get("minutes_lost"):
         try:
             body["minutes_lost"] = int(raw["minutes_lost"])
         except (TypeError, ValueError):
             raise ValueError(f"minutes_lost '{raw['minutes_lost']}' is not a number") from None
-    guess = raw.get("guess_correct")
-    if guess not in (None, ""):
-        if str(guess).lower() not in ("true", "false", "yes", "no", "1", "0"):
+    guess = raw.get("guess_correct", "").lower()
+    if guess:
+        if guess not in ("true", "false", "yes", "no", "1", "0"):
             raise ValueError(f"guess_correct '{guess}' is not true or false")
-        body["guess_correct"] = str(guess).lower() in ("true", "yes", "1")
+        body["guess_correct"] = guess in ("true", "yes", "1")
     return Row(project, body)
 
 
@@ -78,6 +85,6 @@ def parse(text: str, filename: str) -> Parsed:
     for line, raw in numbered:
         try:
             parsed.rows.append(_parse_row(raw if isinstance(raw, dict) else {}))
-        except ValueError as err:
+        except (ValueError, TypeError) as err:
             parsed.errors.append(f"row {line}: {err}")
     return parsed

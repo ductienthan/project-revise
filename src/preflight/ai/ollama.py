@@ -45,6 +45,7 @@ class OllamaClient:
             "model": model,
             "stream": False,
             "think": False,
+            "truncate": False,
             "format": schema,
             "options": {"temperature": 0, "num_ctx": self.context_tokens, "num_predict": max_tokens},
             "messages": [
@@ -57,8 +58,7 @@ class OllamaClient:
         except httpx.HTTPError as err:
             raise AIError(f"Could not reach Ollama at {self.url} ({err.__class__.__name__}).") from None
         if response.status_code != 200:
-            detail = response.json().get("error", response.text) if response.content else response.status_code
-            raise AIError(f"Ollama returned an error: {detail}")
+            raise AIError(_error_message(response, model))
         data = response.json()
         if data.get("done_reason") == "length":
             raise AIError("The reply was cut off at the output limit.")
@@ -68,3 +68,19 @@ class OllamaClient:
             input_tokens=data.get("prompt_eval_count", 0),
             output_tokens=data.get("eval_count", 0),
         )
+
+
+def _error_message(response: httpx.Response, model: str) -> str:
+    try:
+        error = response.json().get("error", response.text)
+        if isinstance(error, str) and error.startswith("{"):
+            error = json.loads(error).get("error", error)
+    except ValueError:
+        error = response.text
+    if isinstance(error, dict) and error.get("type") == "exceed_context_size_error":
+        return (
+            f"The material is {error.get('n_prompt_tokens')} tokens but {model}'s context is {error.get('n_ctx')}. "
+            "Raise PREFLIGHT_OLLAMA_CONTEXT_TOKENS or approve less."
+        )
+    message = error.get("message", error) if isinstance(error, dict) else error
+    return f"Ollama returned an error: {message}"
