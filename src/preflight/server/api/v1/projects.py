@@ -38,9 +38,10 @@ ProjectRef = Annotated[Project, Depends(project_ref)]
 
 
 def checklist_out(project: Project) -> ChecklistOut:
+    linked = checklist.linked_failures(project)
     return ChecklistOut(
         project=ProjectOut.model_validate(project),
-        items=[ChecklistItemOut.model_validate(i) for i in project.checklist_items],
+        items=[ChecklistItemOut.model_validate(i).model_copy(update={"linked_failures": linked.get(i.id, [])}) for i in project.checklist_items],
         unresolved_required=[i.position for i in lifecycle.unresolved_required(project)],
     )
 
@@ -86,6 +87,13 @@ def start(body: StartIn, project: ProjectRef, db: Db, at: Now) -> StartOut:
     result = lifecycle.start(db, project, at, body.override_reason)
     db.commit()
     return StartOut(started=result.started, checklist=checklist_out(project))
+
+
+@router.post("/projects/{ref}/checklist/refresh")
+def refresh_checklist(project: ProjectRef, db: Db, at: Now) -> ChecklistOut:
+    lifecycle.refresh(db, project, at)
+    db.commit()
+    return checklist_out(project)
 
 
 @router.get("/projects/{ref}/checklist", response_model=None)

@@ -16,7 +16,7 @@
       <td>{{ i.position }}</td>
       <td>{{ i.text }} {% if i.required %}<span class="tag required">required</span>{% endif %} <span class="tag">{{ i.priority }}</span></td>
       <td class="muted">{{ i.why }}</td>
-      <td>{{ i.status }}{% if i.reason %}: {{ i.reason }}{% endif %}{% if i.revisit_date %} (until {{ i.revisit_date }}){% endif %}{% if i.id in unresolved %} <span class="error">open</span>{% endif %}</td>
+      <td>{{ i.status }}{% if i.reason %}: {{ i.reason }}{% endif %}{% if i.revisit_date %} (until {{ i.revisit_date }}){% endif %}{% if i.id in unresolved %} <span class="error">open</span>{% endif %}{% for title in linked.get(i.id, []) %}<div class="small error">Failed anyway: {{ title }}</div>{% endfor %}</td>
     </tr>
   {% endfor %}
   </tbody>

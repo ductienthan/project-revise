@@ -352,10 +352,11 @@ def ai_review(run: Run) -> None:
     req = run.workdir / "ai-req.md"
     req.write_text("Retries on provider errors.\nPer-user budgets.\n")
     run.cli("new", "ai-gateway", "--idea", "SECRET-IDEA-TEXT", "--requirements", str(req), "--no-input")
-    answers = "n\ny\ny\n" + "3 attempts, 2s backoff, 10s deadline\nn\n\n" + "y\ny\n" + "d\n" * 20
+    answers = "v\nn\ny\ny\n" + "3 attempts, 2s backoff, 10s deadline\nn\n\n" + "y\ny\n" + "d\n" * 20
     out = run.cli("ai-gateway", "start", input=answers)
     run.ok("Will be sent to AI (claude-opus-5-5, at most about $" in out, "review shows the model and a cost ceiling", out)
     run.ok("[1] Idea and goals" in out and "[2] Requirements v1" in out and "[3] Failure history and rules" in out, "each item is offered for approval")
+    run.ok("exactly what would be sent for [1]" in out and "SECRET-IDEA-TEXT" in out, "an item's exact text can be viewed before approving", out)
     run.ok("Q1 (missed edge case): What are the max attempts" in out, "questions are grouped by past failure category")
     run.ok("Dropped 1 suggestion(s) that cited nothing you sent." in out, "a suggestion with an invented reference is dropped")
     run.ok("Define behavior when the provider returns 429" in out and "No answer yet: What happens to requests when the cache is down?" in out,
@@ -370,6 +371,13 @@ def ai_review(run: Run) -> None:
     run.ok(sent["body"]["model"] == "claude-opus-5-5" and sent["body"]["fallbacks"] == "default"
            and "server-side-fallback-2026-07-01" in sent["headers"]["anthropic-beta"], "review uses Opus 5.5 with refusal fallbacks")
     run.ok(sent["body"]["messages"][0]["content"][0].get("cache_control") == {"type": "ephemeral"}, "failure history is the cached prefix")
+
+    req.write_text("Retries on provider errors.\nPer-user budgets.\nCache answers for 10 minutes.\n")
+    run.cli("ai-gateway", "requirements", "--file", str(req))
+    out = run.cli("ai-gateway", "review", input="n\ny\ny\n" + "\n\n\n" + "y\ny\n")
+    run.ok("changed since the last review" in out, "changed requirements are flagged when reviewing again", out)
+    run.ok("Checklist (" in out and "Define behavior when the provider returns 429" in out, "a started project's checklist is refreshed by a new review", out)
+    run.ok("is started" in run.cli("ai-gateway", "status"), "reviewing again leaves the project started")
 
     out = run.cli("ai-gateway", "fail", "Webhook retries never stopped", input="\n" * 8 + "y\ny\nskip\n")
     run.ok("Root cause: No deadline on the call" in out and "Saved." in out, "AI classification is suggested, confirmed and saved", out)

@@ -18,6 +18,7 @@ class ReviewItemOut(BaseModel):
     kind: str
     label: str
     tokens: int
+    text: str
 
 
 class ReviewItemsOut(BaseModel):
@@ -27,7 +28,9 @@ class ReviewItemsOut(BaseModel):
     excluded_sensitive: int
     model: str | None
     max_cost_usd: float
-    last_review_version: int | None
+    calls: int
+    reviewed: bool
+    review_current: bool
     requirements_version: int | None
 
 
@@ -88,21 +91,25 @@ def review_out(db, r: Review, dropped: int = 0) -> ReviewOut:
 
 
 @router.get("/projects/{ref}/review-items")
-def review_items(request: Request, project: ProjectRef, db: Db, settings: AppSettings) -> ReviewItemsOut:
+def review_items(request: Request, project: ProjectRef, db: Db) -> ReviewItemsOut:
     found = review.material(db, project)
     offered = gate.offerable(found.items)
     ai = _ai(request)
-    estimate = gate.estimate(ai, REVIEW, offered) if ai is not None and ai.available() else None
+    ready = ai is not None and ai.available()
+    batches = review.plan_batches(offered, gate.input_budget(ai, REVIEW)) if ready and offered else []
+    estimates = [gate.estimate(ai, REVIEW, batch) for batch in batches]
     last = review.latest_review(db, project, completed=True)
     current = review.latest_requirements(project)
     return ReviewItemsOut(
-        ai_available=estimate is not None,
+        ai_available=ready,
         provider=ai.provider if ai is not None else None,
-        items=[ReviewItemOut(id=i.id, kind=i.kind, label=i.label, tokens=i.tokens) for i in offered],
+        items=[ReviewItemOut(id=i.id, kind=i.kind, label=i.label, tokens=i.tokens, text=i.text) for i in offered],
         excluded_sensitive=found.excluded_sensitive,
-        model=estimate.model if estimate else None,
-        max_cost_usd=estimate.max_cost_usd if estimate else 0.0,
-        last_review_version=last.requirements_version if last else None,
+        model=ai.model_for(REVIEW.role) if ready else None,
+        max_cost_usd=round(sum(e.max_cost_usd for e in estimates), 4),
+        calls=len(batches),
+        reviewed=last is not None,
+        review_current=last is not None and last.material_hash == review.material_hash(found),
         requirements_version=current.version if current else None,
     )
 

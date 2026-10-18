@@ -45,6 +45,8 @@ def print_checklist(checklist: dict) -> None:
             status += f": {i['reason']}"
         if i["revisit_date"]:
             status += f" (until {i['revisit_date']})"
+        if i["linked_failures"]:
+            status += f"; failed anyway: {', '.join(i['linked_failures'])}"
         table.add_row(str(i["position"]), flag, i["text"], i["why"], status)
     console.print(table)
 
@@ -90,31 +92,41 @@ def requirements(path: str | None, text: str | None) -> None:
 QUESTION_CHOICES = {"n": "not relevant", "d": "deferred"}
 
 
-def run_review(client: Client, name: str, again: bool) -> None:
+def _approve(n: int, item: dict) -> bool:
+    while True:
+        choice = click.prompt(f"  [{n}] {item['label']} (~{item['tokens']} tokens)  approve? [y]es, [n]o, [v]iew",
+                              type=click.Choice(["y", "n", "v"]), default="n", show_choices=False, show_default=False)
+        if choice != "v":
+            return choice == "y"
+        click.echo_via_pager(f"--- exactly what would be sent for [{n}] ---\n{item['text']}\n--- end ---\n")
+
+
+def run_review(client: Client, name: str, again: bool) -> bool:
+    """Offer each item for approval, run the review, and record answers. Returns whether a review ran."""
     found = client.get(f"/projects/{name}/review-items")
     if not found["ai_available"]:
-        console.print("AI review is not available on this server. Building the checklist from your history and rules.")
-        return
-    current, last = found["requirements_version"], found["last_review_version"]
-    if last is not None and last == current and not again:
-        console.print(f"Using the earlier review of requirements v{current}. Pass --review-again to run a new one.")
-        return
-    if last is not None and last != current:
-        console.print(f"Requirements changed since the last review (v{last} to v{current}).")
+        where = "Ollama is not running or has no models" if found["provider"] == "ollama" else "no AI is configured on the server"
+        console.print(f"AI review is not available ({where}). Building the checklist from your history and rules.")
+        return False
+    if found["review_current"] and not again:
+        console.print("Using the earlier review. Nothing it could see has changed. Pass --review-again to run a new one.")
+        return False
+    if found["reviewed"] and not found["review_current"]:
+        console.print("Your requirements, links, or history changed since the last review.")
     if not found["items"]:
         console.print("Nothing to review yet.")
-        return
-    console.print(f"Will be sent to AI ({found['model']}, at most about ${found['max_cost_usd']:.2f}). Approve each:")
+        return False
+    calls = f", in {found['calls']} calls" if found["calls"] > 1 else ""
+    if found["provider"] == "ollama":
+        console.print(f"Will be sent to your Ollama model ({found['model']}, no cost{calls}). Approve each:")
+    else:
+        console.print(f"Will be sent to AI ({found['model']}, at most about ${found['max_cost_usd']:.2f}{calls}). Approve each:")
     if found["excluded_sensitive"]:
         console.print(f"  {found['excluded_sensitive']} sensitive item(s) are never offered.")
-    approved = [
-        item["id"]
-        for n, item in enumerate(found["items"], start=1)
-        if click.confirm(f"  [{n}] {item['label']} (~{item['tokens']} tokens)  approve?", default=False)
-    ]
+    approved = [item["id"] for n, item in enumerate(found["items"], start=1) if _approve(n, item)]
     if not approved:
         console.print("Nothing approved, nothing sent. Building the checklist from your history and rules.")
-        return
+        return False
     review = client.post(f"/projects/{name}/reviews", json={"approved_item_ids": approved})
     console.print(f"Review done (${review['cost_usd']:.3f}). Questions based on your history:")
     answers = []
@@ -135,6 +147,20 @@ def run_review(client: Client, name: str, again: bool) -> None:
     if review["dropped_drafts"]:
         console.print(f"Dropped {review['dropped_drafts']} suggestion(s) that cited nothing you sent.")
     client.post(f"/reviews/{review['id']}/answers", json={"answers": answers, "accepted_drafts": accepted})
+    return True
+
+
+@project.command("review")
+def review_command() -> None:
+    """Run the AI review again, for example after requirements or links change."""
+    name, client = _ctx()
+    if not run_review(client, name, again=True):
+        return
+    status = client.get(f"/projects/{name}")["status"]
+    if status == "started":
+        print_checklist(client.post(f"/projects/{name}/checklist/refresh"))
+    else:
+        console.print(f"Review saved. Run `preflight {name} start` to build the checklist from it.")
 
 
 @project.command()

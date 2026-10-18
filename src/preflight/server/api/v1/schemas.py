@@ -62,6 +62,7 @@ class ChecklistItemOut(Out):
     reason: str
     revisit_date: date | None
     outcome: ItemOutcome | None
+    linked_failures: list[str] = []
 
 
 class ChecklistOut(BaseModel):

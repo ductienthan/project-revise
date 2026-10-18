@@ -6,7 +6,16 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from preflight.core import failures, lifecycle, links, patterns, progress, projects, report
+from preflight.core import (
+    checklist,
+    failures,
+    lifecycle,
+    links,
+    patterns,
+    progress,
+    projects,
+    report,
+)
 from preflight.db.models import FailureCategory, Project
 from preflight.server.auth import service
 from preflight.server.deps import (
@@ -121,6 +130,7 @@ def project_page(request: Request, name: str, principal: PagePrincipal, db: Db) 
         requirements=projects.latest_requirements(project),
         failures=failures.search_failures(db, principal.user.id, project_id=project.id),
         unresolved={i.id for i in lifecycle.unresolved_required(project)},
+        linked=checklist.linked_failures(project),
     )
 
 

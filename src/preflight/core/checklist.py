@@ -5,8 +5,10 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from preflight.core.patterns import REPEAT_THRESHOLD, detect_patterns
+from preflight.core.failures import failure_text
+from preflight.core.patterns import REPEAT_THRESHOLD, detect_patterns, pattern_failures
 from preflight.core.projects import latest_requirements
+from preflight.core.text import keywords, overlap
 from preflight.db.models import (
     ChecklistItem,
     Failure,
@@ -86,6 +88,16 @@ def failure_candidates(failures: list[Failure], repeats: dict, covered_categorie
     return [c for i, c in enumerate(candidates) if c.required or i < MAX_FAILURE_ITEMS]
 
 
+RULE_MATCH_THRESHOLD = 0.25
+
+
+def rule_matches(pattern: Pattern, pattern_text: str, project_text: str) -> bool:
+    """Cross-project rules apply everywhere. A rule from one project's pattern applies where the plan looks alike."""
+    if pattern.project_scope is None:
+        return True
+    return overlap(keywords(pattern_text), keywords(project_text)) >= RULE_MATCH_THRESHOLD
+
+
 def rule_candidates(rules: list[tuple[Rule, Pattern]]) -> list[Candidate]:
     return [
         Candidate(
@@ -98,8 +110,12 @@ def rule_candidates(rules: list[tuple[Rule, Pattern]]) -> list[Candidate]:
             10.0,
         )
         for rule, pattern in rules
-        if rule.status != RuleStatus.RETIRED
     ]
+
+
+def project_text(project: Project) -> str:
+    current = latest_requirements(project)
+    return " ".join((project.name, project.idea, project.goals, current.text if current else ""))
 
 
 def order(candidates: list[Candidate]) -> list[Candidate]:
@@ -110,10 +126,13 @@ def build_checklist(db: Session, project: Project, at: datetime, extra: list[Can
     """Rebuild the project's items from history. Statuses of items that survive the rebuild are kept."""
     patterns = detect_patterns(db, project.user_id)
     repeats = {p.category: p.failure_count for p in patterns if p.project_scope is None}
-    rules = db.execute(
-        select(Rule, Pattern).join(Pattern, Rule.pattern_id == Pattern.id).where(Rule.user_id == project.user_id)
+    live = db.execute(
+        select(Rule, Pattern).join(Pattern, Rule.pattern_id == Pattern.id)
+        .where(Rule.user_id == project.user_id, Rule.status != RuleStatus.RETIRED)
     ).all()
-    covered = {pattern.category for rule, pattern in rules if rule.status != RuleStatus.RETIRED}
+    plan = project_text(project)
+    rules = [(r, p) for r, p in live if rule_matches(p, " ".join(failure_text(f) for f in pattern_failures(db, p)), plan)]
+    covered = {pattern.category for _, pattern in rules}
     history = list(db.scalars(select(Failure).where(Failure.user_id == project.user_id, Failure.project_id != project.id)))
 
     unique: dict[tuple[SourceType, str], Candidate] = {}
@@ -148,6 +167,7 @@ def build_checklist(db: Session, project: Project, at: datetime, extra: list[Can
 
 
 def to_markdown(project: Project) -> str:
+    linked = linked_failures(project)
     lines = [f"# Checklist: {project.name}", ""]
     if project.checklist_requirements_version:
         lines += [f"Built from requirements v{project.checklist_requirements_version}.", ""]
@@ -158,4 +178,15 @@ def to_markdown(project: Project) -> str:
         if item.status in (ItemStatus.NOT_APPLICABLE, ItemStatus.DEFERRED):
             until = f" until {item.revisit_date}" if item.revisit_date else ""
             lines.append(f"  - {item.status}{until}: {item.reason}")
+        for title in linked.get(item.id, []):
+            lines.append(f"  - failed anyway: {title}")
     return "\n".join(lines) + "\n"
+
+
+def linked_failures(project: Project) -> dict[uuid.UUID, list[str]]:
+    """Titles of this project's failures linked to each checklist item, oldest first."""
+    linked: dict[uuid.UUID, list[str]] = {}
+    for f in sorted(project.failures, key=lambda f: f.occurred_at):
+        if f.checklist_item_id is not None:
+            linked.setdefault(f.checklist_item_id, []).append(f.title)
+    return linked

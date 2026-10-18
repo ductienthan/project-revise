@@ -1,0 +1,102 @@
+{
+  "model": "ollama:gemma4:12b",
+  "trials": 2,
+  "results": {
+    "llm-gateway": [
+      {
+        "ok": true,
+        "recall": 0.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 5,
+        "seconds": 20.4,
+        "cost_usd": 0.0
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 12.7,
+        "cost_usd": 0.0
+      }
+    ],
+    "payments-webhooks": [
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 1,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 5,
+        "seconds": 16.6,
+        "cost_usd": 0.0
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 1,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 5,
+        "seconds": 15.7,
+        "cost_usd": 0.0
+      }
+    ],
+    "vendor-csv-import": [
+      {
+        "ok": true,
+        "recall": 0.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 13.3,
+        "cost_usd": 0.0
+      },
+      {
+        "ok": true,
+        "recall": 0.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 13.5,
+        "cost_usd": 0.0
+      }
+    ],
+    "reminder-scheduler": [
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 1,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 5,
+        "seconds": 16.2,
+        "cost_usd": 0.0
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 1,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 5,
+        "seconds": 16.1,
+        "cost_usd": 0.0
+      }
+    ]
+  }
+}

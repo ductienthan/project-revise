@@ -68,6 +68,13 @@ def start(db: Session, project: Project, at: datetime, override_reason: str | No
     return StartResult(True, [])
 
 
+def refresh(db: Session, project: Project, at: datetime) -> list[ChecklistItem]:
+    """Fold new history, rules, and accepted review drafts into a started project's checklist. Statuses are kept."""
+    if project.status != ProjectStatus.STARTED:
+        raise DomainError("Draft projects build their checklist with start. Closed projects are not changed.")
+    return build_checklist(db, project, at, review.candidates(db, project))
+
+
 def set_item_status(
     db: Session, item: ChecklistItem, project: Project, status: ItemStatus, reason: str, revisit: date | None, at: datetime
 ) -> bool:

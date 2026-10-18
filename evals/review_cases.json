@@ -1,0 +1,66 @@
+[
+  {
+    "name": "llm-gateway",
+    "idea": "A proxy in front of several LLM providers with fallback, caching, and per-user cost limits.",
+    "requirements": "Route each request to the primary provider, and fall back to the secondary on errors.\nRetry provider errors before falling back.\nCache identical prompts for 10 minutes.\nTrack spend per user and reject requests once a user's monthly budget is used.\nReturn the first token within 800 ms at p95.",
+    "history": [
+      {"title": "Retry loop hung for 40 minutes", "category": "missed edge case", "severity": "high", "minutes_lost": 40,
+       "root_cause": "Retries had no total deadline and the provider stalled", "prevention": "Every external call has a timeout, a retry cap, and backoff"},
+      {"title": "Budget counter lost updates under load", "category": "state or concurrency bug", "severity": "high", "minutes_lost": 90,
+       "root_cause": "Read-modify-write on the counter without a lock", "prevention": "Shared counters change in one atomic update"},
+      {"title": "Settings page buttons misaligned on Safari", "category": "no verification", "severity": "low", "minutes_lost": 15,
+       "root_cause": "Never opened the page in Safari", "prevention": "Check layout in every supported browser"}
+    ],
+    "relevant": ["Retry loop hung for 40 minutes", "Budget counter lost updates under load"],
+    "irrelevant": ["Settings page buttons misaligned on Safari"],
+    "categories": ["missed edge case", "state or concurrency bug"]
+  },
+  {
+    "name": "payments-webhooks",
+    "idea": "Receive payment webhooks from the card processor, record payments, and email a daily summary.",
+    "requirements": "Accept webhook events for payment succeeded and refunded.\nStore each payment once.\nThe processor retries a webhook until it gets a 2xx response.\nSend each merchant a daily summary at 8am in the merchant's time zone.",
+    "history": [
+      {"title": "Same webhook charged a customer twice", "category": "state or concurrency bug", "severity": "high", "minutes_lost": 120,
+       "root_cause": "Handler was not idempotent and the sender retried", "prevention": "Webhook handlers dedupe on the event id"},
+      {"title": "Daily report sent at the wrong hour after the clocks changed", "category": "wrong assumption", "severity": "medium", "minutes_lost": 45,
+       "root_cause": "Scheduled with a fixed UTC offset", "prevention": "Schedule in the user's zone, not a fixed offset"},
+      {"title": "Avatar upload rejected large photos", "category": "missed edge case", "severity": "low", "minutes_lost": 20,
+       "root_cause": "Upload limit lower than phone photo sizes", "prevention": "Test uploads with real-world file sizes"}
+    ],
+    "relevant": ["Same webhook charged a customer twice", "Daily report sent at the wrong hour after the clocks changed"],
+    "irrelevant": ["Avatar upload rejected large photos"],
+    "categories": ["state or concurrency bug", "wrong assumption"]
+  },
+  {
+    "name": "vendor-csv-import",
+    "idea": "A nightly job that imports product files from vendors into the catalog.",
+    "requirements": "Download each vendor's CSV file every night.\nFiles can be several gigabytes.\nSome vendors export from Excel.\nReject rows with a missing SKU and report them to the vendor.",
+    "history": [
+      {"title": "Import crashed on a file with a byte order mark", "category": "missed edge case", "severity": "medium", "minutes_lost": 60,
+       "root_cause": "Header parse failed on the BOM from an Excel export", "prevention": "Parsers handle a BOM and other encodings"},
+      {"title": "Import job ran out of memory on a large file", "category": "wrong approach", "severity": "high", "minutes_lost": 180,
+       "root_cause": "Loaded the whole file into memory", "prevention": "Stream large files row by row"},
+      {"title": "OAuth token refresh raced between two tabs", "category": "state or concurrency bug", "severity": "medium", "minutes_lost": 50,
+       "root_cause": "Both tabs refreshed with the same refresh token", "prevention": "Serialize token refresh"}
+    ],
+    "relevant": ["Import crashed on a file with a byte order mark", "Import job ran out of memory on a large file"],
+    "irrelevant": ["OAuth token refresh raced between two tabs"],
+    "categories": ["missed edge case", "wrong approach"]
+  },
+  {
+    "name": "reminder-scheduler",
+    "idea": "Send push reminders to users at 9am their local time, with retries.",
+    "requirements": "Each user picks reminder days.\nSend at 9am in the user's local time.\nRetry failed pushes up to three times.\nThe service runs as two instances behind a load balancer.",
+    "history": [
+      {"title": "Cron job ran twice after a deploy", "category": "state or concurrency bug", "severity": "high", "minutes_lost": 75,
+       "root_cause": "Both instances ran the scheduler", "prevention": "Exactly one instance owns scheduled jobs"},
+      {"title": "Notifications shifted an hour at daylight saving", "category": "wrong assumption", "severity": "medium", "minutes_lost": 40,
+       "root_cause": "Stored local times as UTC offsets", "prevention": "Store the time zone name, not the offset"},
+      {"title": "Database migration locked the orders table", "category": "knowledge gap", "severity": "high", "minutes_lost": 30,
+       "root_cause": "Added an index without CONCURRENTLY", "prevention": "Review migrations for table locks"}
+    ],
+    "relevant": ["Cron job ran twice after a deploy", "Notifications shifted an hour at daylight saving"],
+    "irrelevant": ["Database migration locked the orders table"],
+    "categories": ["state or concurrency bug", "wrong assumption"]
+  }
+]
