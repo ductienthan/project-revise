@@ -34,7 +34,7 @@ class Web:
         }
 
     def handler(self, request: httpx.Request) -> httpx.Response:
-        url = str(request.url)
+        url = f"{request.url.scheme}://{request.headers['host']}{request.url.raw_path.decode()}"
         self.requests.append(url)
         return self.pages.get(url, httpx.Response(404))
 

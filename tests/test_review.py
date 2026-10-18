@@ -140,8 +140,9 @@ def test_without_ai_the_review_fails_clearly_and_the_rule_checklist_still_works(
     assert texts == [TIMEOUT_CHECK]
 
 
-def test_monthly_budget_stops_further_calls(app, ready):
-    app.state.settings.ai_monthly_budget_usd = 0.005
+def test_monthly_budget_counts_each_call_at_its_worst_case(app, ready):
+    worst = items(ready)["max_cost_usd"]
+    app.state.settings.ai_monthly_budget_usd = worst + 0.001
     review(ready, ["req:v1"])
     response = ready.post("/api/v1/projects/gateway/reviews", json={"approved_item_ids": ["req:v1"]})
     assert response.status_code == 503 and "budget" in response.json()["detail"]

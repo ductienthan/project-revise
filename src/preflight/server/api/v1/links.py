@@ -72,7 +72,7 @@ def link_out(link: Link) -> LinkOut:
 
 def _capture(request: Request, db, link: Link, at: datetime) -> Captured:
     try:
-        snapshot = links.capture(db, request.app.state.fetcher, link, at)
+        snapshot = links.capture(db, request.app.state.fetcher, link, at, request.app.state.settings.capture_browser)
     except CaptureError as err:
         db.commit()
         return Captured(link=link_out(link), capture_error=str(err))

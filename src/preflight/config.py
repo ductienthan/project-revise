@@ -5,15 +5,14 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="PREFLIGHT_", env_file=".env", extra="ignore")
 
     database_url: str = "sqlite:///./preflight.db"
-    secret_key: str = "dev-only"
     anthropic_api_key: str | None = None
     anthropic_base_url: str | None = None
     review_model: str = "claude-opus-5-5"
     small_model: str = "claude-haiku-5-5"
     ai_monthly_budget_usd: float = 5.0
-    api_url: str = "http://localhost:8000"
 
     capture_allow_private: bool = False
+    capture_browser: bool = False
     retrospective_required: bool = True
     rule_observation_days: int = 28
     require_https: bool = False

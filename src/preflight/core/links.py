@@ -26,7 +26,7 @@ def add_link(db: Session, project: Project, url: str, title: str, note: str, int
     return link
 
 
-def capture(db: Session, fetcher: Fetcher, link: Link, at: datetime) -> Snapshot:
+def capture(db: Session, fetcher: Fetcher, link: Link, at: datetime, use_browser: bool = False) -> Snapshot:
     """Fetch a public link into a new snapshot version. Internal links are never fetched."""
     if link.type == LinkType.INTERNAL:
         raise DomainError("Internal links are references only and are never fetched.")
@@ -34,7 +34,12 @@ def capture(db: Session, fetcher: Fetcher, link: Link, at: datetime) -> Snapshot
     try:
         found = extract(page.html, page.url)
     except NeedsJavaScript:
-        found = extract(browser.render(page.url), page.url)
+        if not use_browser:
+            raise NeedsJavaScript(
+                "This page needs JavaScript. Browser capture is off; set PREFLIGHT_CAPTURE_BROWSER=true "
+                "and install the browser extra (preflight[browser]) to allow it."
+            ) from None
+        found = extract(browser.render(page.url, fetcher.allowed_address), page.url)
     text = f"# {found.title}\n\n{found.text}" if found.title and not found.text.startswith("# ") else found.text
     snapshot = Snapshot(
         user_id=link.user_id,

@@ -62,6 +62,8 @@ class AnthropicClient:
             raise AIError(f"The Anthropic API returned {err.status_code}.") from None
         except anthropic.APIConnectionError:
             raise AIError("Could not reach the Anthropic API.") from None
+        except anthropic.APIError as err:
+            raise AIError(f"The Anthropic API call failed ({err.__class__.__name__}).") from None
         if response.stop_reason == "refusal":
             raise AIError("The model declined this request.")
         if response.stop_reason == "max_tokens":

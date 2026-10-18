@@ -2,6 +2,7 @@ import uuid
 from datetime import date, datetime, timedelta
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from preflight.ai import gate
@@ -56,11 +57,15 @@ def create_missing(db: Session, user_id: uuid.UUID, today: date) -> int:
         if failure.id in have:
             continue
         drill = drill_for(failure, name)
-        if drill is not None:
-            drill.due_date = max(drill.due_date, today)
-            db.add(drill)
-            created += 1
-    db.flush()
+        if drill is None:
+            continue
+        drill.due_date = max(drill.due_date, today)
+        try:
+            with db.begin_nested():
+                db.add(drill)
+        except IntegrityError:
+            continue
+        created += 1
     return created
 
 

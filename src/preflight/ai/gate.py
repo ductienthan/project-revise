@@ -1,6 +1,7 @@
 """The approval gate. Nothing reaches the model unless it is offerable, approved for this call, and logged."""
 
 import json
+import threading
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -14,7 +15,7 @@ from preflight.ai.prompts import Prompt
 from preflight.ai.schemas import strict_schema
 from preflight.config import Settings
 from preflight.core.errors import DomainError
-from preflight.db.models import AiCall
+from preflight.db.models import AiCall, User
 
 CHARS_PER_TOKEN = 4
 
@@ -100,25 +101,13 @@ def run(
     payload = build_payload(items, approved_ids)
     if not payload:
         raise DomainError("Nothing was approved, so nothing was sent.")
-    if spent_this_month(db, user_id, at) >= settings.ai_monthly_budget_usd:
-        raise AIUnavailable(f"This month's AI budget of ${settings.ai_monthly_budget_usd:.2f} is used up.")
-
-    model = model_for(settings, prompt)
-    content = _content(payload)
-    call = AiCall(
-        user_id=user_id,
-        kind=prompt.kind,
-        prompt_version=prompt.version,
-        model=model,
-        approved_items=sorted(approved_ids),
-        payload=json.dumps({"system": prompt.system, "content": content}),
-    )
-    db.add(call)
-    db.flush()
+    call = _reserve(db, settings, user_id, prompt, payload, approved_ids, at)
     schema = strict_schema(prompt.output)
+    content = json.loads(call.payload)["content"]
+    call.cost_usd = 0.0
     try:
         for _ in range(2):
-            completion = ai.complete(model=model, system=prompt.system, content=content, schema=schema, max_tokens=prompt.max_tokens)
+            completion = ai.complete(model=call.model, system=prompt.system, content=content, schema=schema, max_tokens=prompt.max_tokens)
             call.input_tokens += completion.input_tokens
             call.output_tokens += completion.output_tokens
             call.cost_usd += cost_usd(
@@ -127,11 +116,56 @@ def run(
             )
             call.response = completion.text
             try:
-                return prompt.output.model_validate_json(completion.text), call
+                result = prompt.output.model_validate_json(completion.text)
             except ValidationError:
                 continue
+            db.commit()
+            return result, call
         raise AIError("The model's reply did not match the expected format twice.")
     except AIError as err:
         call.error = str(err)
+    except Exception as err:  # noqa: BLE001
+        call.error = f"AI call failed ({err.__class__.__name__})."
+    db.commit()
+    raise AIUnavailable(call.error)
+
+
+_reservation_lock = threading.Lock()
+
+
+def _reserve(
+    db: Session,
+    settings: Settings,
+    user_id: uuid.UUID,
+    prompt: Prompt,
+    payload: list[GateItem],
+    approved_ids: set[str],
+    at: datetime,
+) -> AiCall:
+    """Log the exact payload and hold the call's worst-case cost before anything is sent.
+
+    The row is committed first, so a crash mid-call still leaves the audit record, and concurrent calls see each
+    other's reservations when checking the budget.
+    """
+    worst = estimate(settings, prompt, payload)
+    with _reservation_lock:
+        db.execute(select(User.id).where(User.id == user_id).with_for_update())
+        spent = spent_this_month(db, user_id, at)
+        if spent + worst.max_cost_usd > settings.ai_monthly_budget_usd:
+            db.rollback()
+            raise AIUnavailable(
+                f"This call could cost up to ${worst.max_cost_usd:.2f}, which would pass this month's AI budget "
+                f"of ${settings.ai_monthly_budget_usd:.2f} (${spent:.2f} used)."
+            )
+        call = AiCall(
+            user_id=user_id,
+            kind=prompt.kind,
+            prompt_version=prompt.version,
+            model=worst.model,
+            approved_items=sorted(approved_ids),
+            payload=json.dumps({"system": prompt.system, "content": _content(payload)}),
+            cost_usd=worst.max_cost_usd,
+        )
+        db.add(call)
         db.commit()
-        raise AIUnavailable(str(err)) from None
+    return call
