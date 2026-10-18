@@ -55,8 +55,7 @@ function weekly() {
   options.scales.x.stacked = true;
   options.scales.y.stacked = true;
   options.plugins.tooltip.filter = (item) => item.raw > 0;
-  const labels = data.weekly.weeks.map((w) => new Date(w + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }));
-  charts.push(new Chart(canvas, { type: "bar", data: { labels, datasets }, options }));
+  charts.push(new Chart(canvas, { type: "bar", data: { labels: weekLabels(data.weekly.weeks), datasets }, options }));
 }
 
 function accuracy() {
@@ -79,10 +78,55 @@ function accuracy() {
   }));
 }
 
+function weekLabels(weeks) {
+  return weeks.map((w) => new Date(w + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }));
+}
+
+function minutes() {
+  const canvas = document.getElementById("minutes-chart");
+  if (!canvas) return;
+  const options = baseOptions();
+  options.plugins.legend.display = false;
+  options.plugins.tooltip.callbacks = { label: (item) => `${item.raw} minutes` };
+  charts.push(new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: weekLabels(data.minutes.weeks),
+      datasets: [{ data: data.minutes.minutes, backgroundColor: token("--series-1"), maxBarThickness: 24,
+                   borderRadius: { topLeft: 4, topRight: 4 }, borderSkipped: "start" }],
+    },
+    options,
+  }));
+}
+
+function calibration() {
+  const canvas = document.getElementById("calibration-chart");
+  if (!canvas) return;
+  const color = token("--series-1");
+  const options = baseOptions();
+  options.plugins.legend.display = false;
+  options.scales.y.beginAtZero = false;
+  options.scales.y.ticks.callback = (v) => `${v > 0 ? "+" : ""}${v}`;
+  options.plugins.tooltip.callbacks = {
+    label: (item) => `${item.raw > 0 ? "+" : ""}${item.raw} pts over ${data.calibration[item.dataIndex].count} predictions`,
+  };
+  charts.push(new Chart(canvas, {
+    type: "line",
+    data: {
+      labels: data.calibration.map((m) => m.month),
+      datasets: [{ data: data.calibration.map((m) => Math.round(m.gap * 100)), borderColor: color, backgroundColor: color,
+                   borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBorderColor: token("--surface-1"), pointBorderWidth: 2 }],
+    },
+    options,
+  }));
+}
+
 function render() {
   charts.splice(0).forEach((c) => c.destroy());
   weekly();
+  minutes();
   accuracy();
+  calibration();
 }
 
 window.addEventListener("DOMContentLoaded", render);

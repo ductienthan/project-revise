@@ -6,6 +6,16 @@
 {% if project.goals %}<p class="muted">Goals: {{ project.goals }}</p>{% endif %}
 <p class="muted">Requirements: {% if requirements %}v{{ requirements.version }}{% else %}none{% endif %}{% if project.checklist_requirements_version %}. Checklist built from v{{ project.checklist_requirements_version }}{% endif %}.</p>
 
+<details{% if error %} open{% endif %}>
+  <summary>Edit requirements</summary>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <form method="post" action="/projects/{{ project.name }}/requirements" class="stack wide">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <label>Requirements (saving a change creates a new version) <textarea name="text" rows="10">{{ requirements.text if requirements else "" }}</textarea></label>
+    <div class="row"><button type="submit">Save requirements</button></div>
+  </form>
+</details>
+
 <h2>Checklist</h2>
 {% if project.checklist_items %}
 <table>

@@ -53,6 +53,28 @@
   {% endif %}
 </section>
 
+<section aria-labelledby="minutes-title">
+  <h2 id="minutes-title">Minutes lost per week</h2>
+  <div class="chart-box short"><canvas id="minutes-chart" role="img" aria-label="Columns of minutes lost to failures each week for the last 12 weeks. The table below has the same numbers."></canvas></div>
+  <details><summary>Show as a table</summary>
+    <table class="num"><thead><tr><th>Week of</th><th>Minutes</th></tr></thead>
+    <tbody>{% for week in data.minutes_lost_per_week.weeks %}<tr><td>{{ week }}</td><td>{{ data.minutes_lost_per_week.minutes[loop.index0] }}</td></tr>{% endfor %}</tbody></table>
+  </details>
+</section>
+
+<section aria-labelledby="calibration-title">
+  <h2 id="calibration-title">Calibration gap, by month</h2>
+  {% if data.calibration_by_month %}
+  <div class="chart-box short"><canvas id="calibration-chart" role="img" aria-label="Line of average confidence minus accuracy for closed predictions, by month. Above zero means overconfident."></canvas></div>
+  <details><summary>Show as a table</summary>
+    <table class="num"><thead><tr><th>Month</th><th>Gap</th><th>Predictions</th></tr></thead>
+    <tbody>{% for m in data.calibration_by_month %}<tr><td>{{ m.month }}</td><td>{{ "%+d" | format((m.gap * 100) | round | int) }} pts</td><td>{{ m.count }}</td></tr>{% endfor %}</tbody></table>
+  </details>
+  {% else %}
+  <p class="muted">The trend appears once three months have closed predictions. Record one with <code>preflight &lt;project&gt; predict</code>.</p>
+  {% endif %}
+</section>
+
 <section aria-labelledby="projects-title">
   <h2 id="projects-title">Project by project</h2>
   {% if data.projects %}
@@ -65,7 +87,7 @@
         <td><a href="/projects/{{ p.name }}">{{ p.name }}</a>{% if p.gate_overridden %} <span class="tag">gate overridden</span>{% endif %}</td>
         <td>{{ p.status }}</td><td>{{ p.failures }}</td><td>{{ p.repeat_rate.text }}</td><td>{{ p.checklist_coverage.text }}</td>
         <td>{{ p.on_checklist_rate.text }}</td><td>{{ p.missed_item_rate.text }}</td><td>{{ p.question_coverage.text }}</td>
-        <td>{{ p.outcomes.helped }} / {{ p.outcomes.missed }} / {{ p.outcomes.irrelevant }}</td><td>{{ p.wins }}</td>
+        <td>{{ p.outcomes.helped }} / {{ p.outcomes.missed }} / {{ p.outcomes.irrelevant }}</td><td>{{ p.wins }}{% if p.wins %}<div class="small muted">{% for tag, n in p.wins_by_tag.items() %}{{ n }} {{ tag }}{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>
@@ -85,6 +107,6 @@
   {% else %}<p class="muted">No rules yet.</p>{% endif %}
 </section>
 
-<script type="application/json" id="progress-data">{{ {"weekly": data.failures_per_week, "accuracy": data.guess_accuracy_by_month, "categories": categories} | tojson }}</script>
+<script type="application/json" id="progress-data">{{ {"weekly": data.failures_per_week, "accuracy": data.guess_accuracy_by_month, "minutes": data.minutes_lost_per_week, "calibration": data.calibration_by_month, "categories": categories} | tojson }}</script>
 </div>
 {% endblock %}

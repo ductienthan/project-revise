@@ -65,15 +65,23 @@ def week_start(day: date) -> date:
     return day - timedelta(days=day.weekday())
 
 
-def minutes_lost_per_week(failures: list[Failure]) -> dict[date, int]:
-    weeks: Counter[date] = Counter()
+def week_starts(today: date, weeks: int) -> list[date]:
+    return [week_start(today) - timedelta(weeks=n) for n in reversed(range(weeks))]
+
+
+def minutes_lost_per_week(failures: list[Failure], today: date, weeks: int = 12) -> dict[str, list]:
+    starts = week_starts(today, weeks)
+    index = {start: i for i, start in enumerate(starts)}
+    minutes = [0] * weeks
     for f in failures:
-        weeks[week_start(f.occurred_at.date())] += f.minutes_lost
-    return dict(sorted(weeks.items()))
+        i = index.get(week_start(f.occurred_at.date()))
+        if i is not None:
+            minutes[i] += f.minutes_lost
+    return {"weeks": [s.isoformat() for s in starts], "minutes": minutes}
 
 
 def failures_per_week_by_category(failures: list[Failure], today: date, weeks: int = 12) -> dict[str, list[int]]:
-    starts = [week_start(today) - timedelta(weeks=n) for n in reversed(range(weeks))]
+    starts = week_starts(today, weeks)
     index = {start: i for i, start in enumerate(starts)}
     series: dict[str, list[int]] = defaultdict(lambda: [0] * weeks)
     for f in failures:
@@ -124,6 +132,14 @@ def calibration_gap(predictions: list[Prediction]) -> tuple[float | None, int]:
     confidence = sum(p.confidence for p in closed) / len(closed) / 100
     accuracy = sum(p.correct for p in closed) / len(closed)
     return round(confidence - accuracy, 3), len(closed)
+
+
+def calibration_by_month(predictions: list[Prediction]) -> list[dict]:
+    months: dict[str, list[Prediction]] = defaultdict(list)
+    for p in sorted(predictions, key=lambda p: p.created_at):
+        if p.correct is not None:
+            months[p.created_at.strftime("%Y-%m")].append(p)
+    return [{"month": m, "gap": calibration_gap(ps)[0], "count": len(ps)} for m, ps in months.items()]
 
 
 def drill_retention(scores: list[int]) -> Ratio:

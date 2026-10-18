@@ -1,0 +1,336 @@
+{
+  "model": "ollama:gemma4:12b",
+  "trials": 3,
+  "results": {
+    "llm-gateway": [
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 12.9,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Budget counter lost updates under load",
+          "Retry loop hung for 40 minutes"
+        ],
+        "drafts_detail": [
+          "gap F:c44f1b89: The plan for REQ:2 does not specify a total deadline or backoff strategy.",
+          "gap F:f4b353a0: The mechanism for atomic updates on the user's monthly budget is not defined.",
+          "item F:c44f1b89: Define a maximum retry cap and timeout for all external provider calls.",
+          "item F:f4b353a0: Implement atomic operations or locks for the budget counter updates."
+        ],
+        "questions_detail": [
+          "missed edge case: What are the specific timeout limits and maximum retry counts for the provider calls in REQ:2 to prevent a hung process?",
+          "state or concurrency bug: How will you ensure that the budget updates in REQ:4 are handled atomically when multiple requests from the same user occur simultaneously?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 1,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 5,
+        "seconds": 15.6,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Budget counter lost updates under load",
+          "Retry loop hung for 40 minutes",
+          "Settings page buttons misaligned on Safari"
+        ],
+        "drafts_detail": [
+          "gap REQ:2: The retry logic in REQ:2 lacks a defined maximum attempt count or total deadline.",
+          "gap REQ:4: The mechanism for updating user spend in REQ:4 is not specified as atomic.",
+          "item F:602aa687: Define a maximum retry cap and backoff strategy for all provider calls.",
+          "item F:9f76bc14: Implement atomic updates or locking for the user budget counter.",
+          "item F:52295d2a: Verify the UI layout in Safari and other supported browsers before launch."
+        ],
+        "questions_detail": [
+          "missed edge case: What are the specific timeout limits and maximum retry counts for the provider calls in REQ:2 to prevent a hung process?",
+          "state or concurrency bug: How will you ensure that the budget updates in REQ:4 use atomic operations to prevent lost updates under high concurrent load?",
+          "no verification: Which specific browsers and devices are included in your testing plan to ensure UI consistency across all platforms?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 1,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 5,
+        "seconds": 14.6,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Budget counter lost updates under load",
+          "Retry loop hung for 40 minutes",
+          "Settings page buttons misaligned on Safari"
+        ],
+        "drafts_detail": [
+          "gap REQ:2: Missing specific timeout and backoff logic for retry loops.",
+          "gap REQ:4: Lack of concurrency strategy for the shared user budget counter.",
+          "item REQ:2: Define a maximum retry cap and timeout for all external provider calls.",
+          "item REQ:4: Implement atomic updates or locking for the user budget counter.",
+          "item REQ:5: Verify layout and functionality in Safari before release."
+        ],
+        "questions_detail": [
+          "missed edge case: What are the specific timeout limits and maximum retry counts for the provider calls in REQ:2 to prevent a hung process?",
+          "state or concurrency bug: How will you ensure that the budget updates in REQ:4 use atomic operations to prevent lost updates under high concurrent load?",
+          "no verification: What is the plan for verifying the UI/frontend layout across all supported browsers, specifically Safari?"
+        ]
+      }
+    ],
+    "payments-webhooks": [
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 14.0,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Daily report sent at the wrong hour after the clocks changed",
+          "Same webhook charged a customer twice"
+        ],
+        "drafts_detail": [
+          "gap F:34d994a3: Missing mechanism to deduplicate incoming webhooks using unique event IDs before processing.",
+          "gap F:7812754f: Lack of specific logic for handling time zone conversions for the daily summary.",
+          "item F:34d994a3: Implement idempotency check using the processor's unique event ID for all incoming webhooks.",
+          "item F:7812754f: Verify that the scheduling logic for REQ:4 dynamically adjusts to the merchant's local timezone."
+        ],
+        "questions_detail": [
+          "state or concurrency bug: How will the handler for REQ:1 ensure that a retried webhook from the processor does not result in duplicate records (F:34d994a3)?",
+          "wrong assumption: Does the logic for REQ:4 calculate the 8am deadline based on the merchant's local timezone rather than a fixed UTC offset (F:7812754f)?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 1,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 5,
+        "seconds": 16.0,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Avatar upload rejected large photos",
+          "Daily report sent at the wrong hour after the clocks changed",
+          "Same webhook charged a customer twice"
+        ],
+        "drafts_detail": [
+          "gap F:8a62f264: Lack of explicit idempotency logic for incoming webhooks.",
+          "gap F:589946a6: Ambiguity in 'merchant's time zone' calculation logic.",
+          "item F:8a62f264: Implement deduplication logic using the unique event ID from the processor for all REQ:1 events.",
+          "item F:589946a6: Verify that the scheduling logic for REQ:4 uses dynamic local time zones rather than fixed UTC offsets.",
+          "item F:b2798274: Define and test maximum file size limits for any uploaded content to ensure compatibility with mobile devices."
+        ],
+        "questions_detail": [
+          "state or concurrency bug: How does the handler for REQ:1 ensure that a retried webhook from the processor (REQ:3) doesn't result in duplicate records?",
+          "wrong assumption: For REQ:4, how is the system calculating '8am' to ensure it remains correct regardless of local daylight savings or regional offsets?",
+          "missed edge case: What are the maximum file sizes for any assets associated with payment records to ensure they aren't rejected by the system?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 1,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 5,
+        "seconds": 16.4,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Avatar upload rejected large photos",
+          "Daily report sent at the wrong hour after the clocks changed",
+          "Same webhook charged a customer twice"
+        ],
+        "drafts_detail": [
+          "gap F:e8fa3fe4: Mechanism for deduplicating incoming webhooks based on unique event IDs.",
+          "gap F:8c28e228: Dynamic timezone calculation for the 8am daily summary.",
+          "item F:e8fa3fe4: Implement idempotency check using unique event IDs for all incoming webhooks.",
+          "item F:8c28e228: Verify that the scheduling logic uses merchant-specific timezones for the 8am report.",
+          "item F:51151916: Validate that system limits accommodate large payload sizes for payment data."
+        ],
+        "questions_detail": [
+          "state or concurrency bug: How does the handler for REQ:1 ensure that a retried webhook from the processor doesn't result in duplicate records (F:e8fa3fe4)?",
+          "wrong assumption: Does the logic for REQ:4 calculate the 8am deadline based on the merchant's local zone rather than a fixed UTC offset to avoid timing shifts (F:8c28e228)?",
+          "missed edge case: What are the maximum file sizes or payload limits for the data received in REQ:1 to ensure large payloads aren't rejected (F:51151916)?"
+        ]
+      }
+    ],
+    "vendor-csv-import": [
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 13.2,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Import crashed on a file with a byte order mark",
+          "Import job ran out of memory on a large file"
+        ],
+        "drafts_detail": [
+          "gap REQ:2: The plan must specify a streaming mechanism for processing the large files mentioned in REQ:2.",
+          "gap REQ:3: The parser must include logic to handle BOM and encoding issues for Excel-sourced files.",
+          "item REQ:2: Verify that the CSV parser uses a streaming buffer for files over 1GB.",
+          "item REQ:3: Confirm that the parser handles Byte Order Marks (BOM) for Excel exports."
+        ],
+        "questions_detail": [
+          "wrong approach: How does the implementation plan for REQ:2 ensure that files of several gigabytes are processed as a stream rather than loaded into memory? (F:f40d4bd9)",
+          "missed edge case: Does the parsing logic for REQ:3 specifically account for Byte Order Marks (BOM) and varied encodings common in Excel exports? (F:b7cfcc22)"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 1,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 13.3,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Import crashed on a file with a byte order mark",
+          "Import job ran out of memory on a large file",
+          "OAuth token refresh raced between two tabs"
+        ],
+        "drafts_detail": [
+          "gap REQ:1: The plan does not specify a mechanism to handle concurrent token refreshes if multiple vendor files are processed simultaneously.",
+          "item REQ:2: Verify that the CSV parser uses a streaming buffer for files exceeding 1GB.",
+          "item REQ:3: Add a pre-processing step to detect and strip BOM characters from Excel-sourced files.",
+          "item REQ:1: Implement a mutex or serialized queue for the OAuth token refresh logic."
+        ],
+        "questions_detail": [
+          "wrong approach: How does the implementation plan for REQ:2 ensure that files of several gigabytes are processed as a stream rather than loaded into memory? (F:f04d3b92)",
+          "missed edge case: Does the parsing logic for REQ:3 specifically account for Byte Order Marks (BOM) and varied encodings common in Excel exports? (F:195be146)"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 12.2,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Import crashed on a file with a byte order mark",
+          "Import job ran out of memory on a large file"
+        ],
+        "drafts_detail": [
+          "gap REQ:2: The plan does not specify a method for streaming large files row by row to prevent memory exhaustion.",
+          "gap REQ:3: The parsing logic needs to explicitly account for Excel-specific encoding issues like BOM.",
+          "item F:3f8a30cd: Implement a streaming reader for CSV processing to handle large files.",
+          "item F:6f64f8a3: Add a pre-processing step or library configuration to strip/handle BOM characters."
+        ],
+        "questions_detail": [
+          "wrong approach: How will the system process files that are several gigabytes in size without loading the entire file into memory? (F:3f8a30cd)",
+          "missed edge case: Does the CSV parser specifically handle Byte Order Marks (BOM) for files exported from Excel? (F:6f64f8a3)"
+        ]
+      }
+    ],
+    "reminder-scheduler": [
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 1,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 5,
+        "seconds": 16.0,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Cron job ran twice after a deploy",
+          "Database migration locked the orders table",
+          "Notifications shifted an hour at daylight saving"
+        ],
+        "drafts_detail": [
+          "gap F:23482c04: Mechanism for distributed locking or leader election is missing to handle multi-instance execution.",
+          "gap F:b6978cde: Specific logic for handling time zone transitions (DST) is not defined in the requirements.",
+          "item F:23482c04: Implement a distributed lock (e.g., Redis/Zookeeper) to ensure only one instance processes the cron job.",
+          "item F:f6e9612b: Verify all SQL migrations use CONCURRENTLY for index creation or table updates.",
+          "item F:b6978cde: Store user time zone names (e.g., 'America/New_York') instead of fixed UTC offsets."
+        ],
+        "questions_detail": [
+          "state or concurrency bug: How will you ensure that only one of the two instances (REQ:4) executes the 9am push job to prevent duplicate notifications?",
+          "knowledge gap: Have you verified that any database migrations for the notification table use non-blocking operations to avoid locking the table during deployment?",
+          "wrong assumption: Are you storing the user's specific time zone name rather than a UTC offset to ensure 9am remains correct during daylight saving transitions?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 1,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 5,
+        "seconds": 16.5,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Cron job ran twice after a deploy",
+          "Database migration locked the orders table",
+          "Notifications shifted an hour at daylight saving"
+        ],
+        "drafts_detail": [
+          "gap F:255d8004: Mechanism for distributed locking or leader election is missing to handle multi-instance execution.",
+          "gap F:7f18a899: Specific logic for handling timezone transitions (DST) is not defined in the requirements.",
+          "item F:255d8004: Implement a distributed lock (e.g., Redis/Zookeeper) for the push job to ensure single-instance execution.",
+          "item F:0a30b691: Verify all SQL migration scripts use CONCURRENTLY for index creation on the orders or reminders tables.",
+          "item F:7f18a899: Confirm that user timezone data is stored as a name (e.g., 'America/New_York') rather than an offset."
+        ],
+        "questions_detail": [
+          "state or concurrency bug: How will you ensure that only one of the two instances (REQ:4) executes the 9am push job to prevent duplicate notifications?",
+          "knowledge gap: Does the migration plan for the new reminder table include 'CONCURRENTLY' for index creation to avoid locking the database?",
+          "wrong assumption: Are you storing the user's timezone name rather than a UTC offset to ensure 9am remains correct during daylight saving shifts?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 1,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 5,
+        "seconds": 16.4,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Cron job ran twice after a deploy",
+          "Database migration locked the orders table",
+          "Notifications shifted an hour at daylight saving"
+        ],
+        "drafts_detail": [
+          "gap F:82c63f0f: Mechanism for distributed locking or leader election is missing to handle multi-instance execution.",
+          "gap F:a9c4f418: Specific logic for handling timezone transitions (DST) is not defined in the requirements.",
+          "item F:82c63f0f: Implement a distributed lock (e.g., Redis/Zookeeper) for the scheduler to ensure single-instance execution.",
+          "item F:59cfc707: Verify all SQL migration scripts use CONCURRENTLY for index creation on the orders or reminders tables.",
+          "item F:a9c4f418: Confirm that user timezone data is stored as a name (e.g., 'America/New_York') rather than an offset."
+        ],
+        "questions_detail": [
+          "state or concurrency bug: How will you ensure that only one of the two instances (REQ:4) executes the 9am push job to prevent duplicate notifications?",
+          "knowledge gap: Does the migration plan for the new reminder table include 'CONCURRENTLY' for index creation to avoid locking the database?",
+          "wrong assumption: Are you storing the user's timezone name rather than a UTC offset to ensure 9am remains correct during daylight saving changes?"
+        ]
+      }
+    ]
+  }
+}

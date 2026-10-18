@@ -50,7 +50,8 @@ def test_median_hours_to_root_cause():
 
 def test_minutes_lost_and_failures_are_grouped_by_monday_weeks():
     rows = [f(0, minutes_lost=10), f(1, minutes_lost=5), f(7, STATE, minutes_lost=20)]
-    assert metrics.minutes_lost_per_week(rows) == {date(2026, 8, 31): 15, date(2026, 9, 7): 20}
+    assert metrics.minutes_lost_per_week(rows, today=date(2026, 9, 10), weeks=3) == {
+        "weeks": ["2026-08-24", "2026-08-31", "2026-09-07"], "minutes": [0, 15, 20]}
     series = metrics.failures_per_week_by_category(rows, today=date(2026, 9, 10), weeks=3)
     assert series == {"weeks": ["2026-08-24", "2026-08-31", "2026-09-07"], "missed edge case": [0, 2, 0], "state or concurrency bug": [0, 0, 1]}
 
@@ -92,6 +93,14 @@ def test_calibration_gap_is_confidence_minus_accuracy():
                    SimpleNamespace(confidence=70, correct=None)]
     assert metrics.calibration_gap(predictions) == (0.35, 2), "0.85 average confidence, 0.5 accuracy"
     assert metrics.calibration_gap([]) == (None, 0)
+
+
+def test_calibration_by_month_uses_closed_predictions_only():
+    def p(month, confidence, correct):
+        return SimpleNamespace(created_at=datetime(2026, month, 5, tzinfo=UTC), confidence=confidence, correct=correct)
+
+    rows = [p(8, 90, False), p(8, 70, True), p(9, 60, True), p(9, 50, None)]
+    assert metrics.calibration_by_month(rows) == [{"month": "2026-08", "gap": 0.3, "count": 2}, {"month": "2026-09", "gap": -0.4, "count": 1}]
 
 
 def test_drill_retention_counts_scores_of_three_or_more():

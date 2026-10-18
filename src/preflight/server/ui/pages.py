@@ -16,6 +16,7 @@ from preflight.core import (
     projects,
     report,
 )
+from preflight.core.errors import DomainError
 from preflight.db.models import FailureCategory, Project
 from preflight.server.auth import service
 from preflight.server.deps import (
@@ -116,7 +117,31 @@ def home(request: Request, principal: PagePrincipal, db: Db) -> HTMLResponse:
         (p, len(p.failures), len(p.wins), len(lifecycle.unresolved_required(p)))
         for p in projects.list_projects(db, principal.user.id)
     ]
-    return render(request, "index.html", principal, rows=rows)
+    return render(request, "index.html", principal, rows=rows, form={})
+
+
+@router.post("/projects", response_class=HTMLResponse)
+def create_project(
+    request: Request, principal: PagePrincipal, db: Db,
+    name: str = Form(), idea: str = Form(""), goals: str = Form(""), requirements: str = Form(""),
+):
+    try:
+        projects.create_project(db, principal.user.id, name.strip(), idea, goals, requirements)
+    except DomainError as err:
+        db.rollback()
+        form = {"name": name, "idea": idea, "goals": goals, "requirements": requirements}
+        rows = [(p, len(p.failures), len(p.wins), len(lifecycle.unresolved_required(p))) for p in projects.list_projects(db, principal.user.id)]
+        return render(request, "index.html", principal, rows=rows, form=form, error=str(err), status_code=400)
+    db.commit()
+    return RedirectResponse(f"/projects/{name.strip()}", status_code=303)
+
+
+@router.post("/projects/{name}/requirements")
+def save_requirements(name: str, principal: PagePrincipal, db: Db, text: str = Form("")):
+    project = projects.find_project(db, principal.user.id, name)
+    projects.save_requirements(db, project, text)
+    db.commit()
+    return RedirectResponse(f"/projects/{name}", status_code=303)
 
 
 @router.get("/projects/{name}", response_class=HTMLResponse)

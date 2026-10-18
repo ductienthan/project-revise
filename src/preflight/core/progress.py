@@ -57,6 +57,7 @@ def progress(db: Session, user_id: uuid.UUID, now: datetime, observation_days: i
     wins = list(db.scalars(select(Win).where(Win.user_id == user_id)))
     gap, closed = metrics.calibration_gap(predictions)
     by_month = accuracy_by_month(failures)
+    calibration = metrics.calibration_by_month(predictions)
     return {
         "projects": project_rows(db, projects, failures),
         "overall": {
@@ -73,7 +74,8 @@ def progress(db: Session, user_id: uuid.UUID, now: datetime, observation_days: i
             "rule_status": metrics.rule_status_counts(rules),
         },
         "failures_per_week": metrics.failures_per_week_by_category(failures, now.date()),
-        "minutes_lost_per_week": {d.isoformat(): m for d, m in metrics.minutes_lost_per_week(recent).items()},
+        "minutes_lost_per_week": metrics.minutes_lost_per_week(failures, now.date()),
+        "calibration_by_month": calibration if metrics.enough_for_trend(len(calibration)) else [],
         "guess_accuracy_by_month": by_month if metrics.enough_for_trend(len(by_month)) else [],
         "rules": [
             {"text": r.checklist_text, "pattern": labels.get(r.pattern_id, ""), "status": r.status.value,

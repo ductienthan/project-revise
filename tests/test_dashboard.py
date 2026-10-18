@@ -74,3 +74,27 @@ def test_progress_and_weekly_pages_render_numbers_with_a_table_view(web):
     assert "chart.js@4.4.6" in page and 'integrity="sha384-' in page
     weekly = web.get("/weekly").text
     assert "Failures: 2 (last week 0), 40 minutes lost." in weekly and "state or concurrency bug: 2" in weekly
+
+
+def test_projects_can_be_created_and_requirements_edited_from_the_dashboard(web):
+    page = web.get("/").text
+    token = csrf(page)
+    no_header = {"X-CSRF-Token": ""}
+    bad = web.post("/projects", data={"name": "drill", "csrf_token": token}, headers=no_header)
+    assert bad.status_code == 400 and "reserved command name" in bad.text and 'value="drill"' in bad.text
+    created = web.post("/projects", data={"name": "gateway", "idea": "LLM proxy", "requirements": "Retries.", "csrf_token": token},
+                       headers=no_header, follow_redirects=False)
+    assert created.status_code == 303 and created.headers["location"] == "/projects/gateway"
+    web.post("/projects/gateway/requirements", data={"text": "Retries.\nBudgets.", "csrf_token": token}, headers=no_header)
+    versions = web.get("/api/v1/projects/gateway/requirements").json()
+    assert [v["version"] for v in versions] == [1, 2] and versions[-1]["text"] == "Retries.\nBudgets."
+    assert web.post("/projects", data={"name": "other"}, headers=no_header).status_code == 403
+
+
+def test_progress_page_has_minutes_and_calibration_sections(web):
+    new_project(web, "billing")
+    fail(web, "billing", "Lost update", minutes_lost=25)
+    web.post("/api/v1/projects/billing/wins", json={"text": "Shipped", "tag": "used a rule"})
+    page = web.get("/progress").text
+    assert "Minutes lost per week" in page and "<td>25</td>" in page
+    assert "three months have closed predictions" in page and "1 used a rule" in page

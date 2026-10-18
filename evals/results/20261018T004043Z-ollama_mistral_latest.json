@@ -1,0 +1,328 @@
+{
+  "model": "ollama:mistral:latest",
+  "trials": 3,
+  "results": {
+    "llm-gateway": [
+      {
+        "ok": true,
+        "recall": 0.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 6,
+        "seconds": 15.9,
+        "cost_usd": 0.0,
+        "cited_failures": [],
+        "drafts_detail": [
+          "gap REQ:1: There is no mention of error handling for the primary provider. What should happen if it fails?",
+          "gap REQ:3: What mechanism will be used to ensure that identical prompts are not cached for more than 10 minutes?",
+          "gap REQ:2: What is the strategy for handling provider errors that exceed the retry cap?",
+          "item REQ:1: Define error handling for the primary provider.",
+          "item REQ:3: Implement a mechanism to prevent caching identical prompts for more than 10 minutes.",
+          "item REQ:2: Define a strategy for handling provider errors that exceed the retry cap."
+        ],
+        "questions_detail": [
+          "missed edge case: What measures are in place to ensure that external calls do not hang due to a missed deadline or stalled provider?",
+          "state or concurrency bug: How will you handle updates to shared counters, such as the per-user cost tracker, under high load without losing data?",
+          "no verification: Do you have a plan to test the layout of the user interface in every supported browser before launching?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 1,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 7,
+        "seconds": 10.5,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Budget counter lost updates under load",
+          "Retry loop hung for 40 minutes",
+          "Settings page buttons misaligned on Safari"
+        ],
+        "drafts_detail": [
+          "gap REQ:1: There is no mention of error handling for the primary provider. What should happen if it fails?",
+          "gap REQ:4: What mechanism will be used to implement the per-user cost limits mentioned in REQ:4?",
+          "item F:25b4e721: Ensure each external call has a timeout, a retry cap, and backoff to prevent hanging as in F:25b4e721.",
+          "item F:39439c3e: Implement a locking mechanism for shared counters to prevent state or concurrency bugs as in F:39439c3e.",
+          "item F:72d0a8aa: Test the layout of the proxy interface on every supported browser as per F:72d0a8aa.",
+          "item REQ:1: Define error handling for the primary provider to address REQ:1 gap.",
+          "item REQ:4: Specify the mechanism for implementing per-user cost limits as required in REQ:4."
+        ],
+        "questions_detail": [
+          "missed edge case: What measures are in place to ensure that external calls do not hang due to a provider stalling, as seen in F:25b4e721?",
+          "state or concurrency bug: How will you handle updates to shared counters under load, considering the issue in F:39439c3e?",
+          "no verification: Do you have a plan to test the layout of the proxy interface on every supported browser, as per F:72d0a8aa?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 0.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 6,
+        "seconds": 8.4,
+        "cost_usd": 0.0,
+        "cited_failures": [],
+        "drafts_detail": [
+          "gap REQ:1: There is no mention of error handling for the primary provider. What should happen if it fails?",
+          "gap REQ:3: What mechanism will be used to ensure that identical prompts are not cached for more than 10 minutes?",
+          "gap REQ:2: What is the strategy for handling provider errors that exceed the retry cap?",
+          "item REQ:1: Define error handling for the primary provider.",
+          "item REQ:3: Implement a mechanism to prevent caching identical prompts for more than 10 minutes.",
+          "item REQ:2: Define a strategy for handling provider errors that exceed the retry cap."
+        ],
+        "questions_detail": [
+          "missed edge case: What measures are in place to ensure that external calls do not hang due to a missed deadline or stalled provider?",
+          "state or concurrency bug: How will you handle updates to shared counters, such as the per-user cost tracker, under high load without losing data?",
+          "no verification: Do you have a plan to test the layout of the user interface in every supported browser before launching?"
+        ]
+      }
+    ],
+    "payments-webhooks": [
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 1,
+        "dropped_share": 0.2,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 4,
+        "seconds": 7.6,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Avatar upload rejected large photos",
+          "Daily report sent at the wrong hour after the clocks changed",
+          "Same webhook charged a customer twice"
+        ],
+        "drafts_detail": [
+          "gap REQ:3: It is not clear how you will handle retried webhooks that the processor sends.",
+          "item F:9abeed8d: Implement idempotency in your webhook handlers to prevent double charging customers.",
+          "item F:b3eeaea9: Test uploading files with real-world sizes to ensure the avatar upload limit is appropriate.",
+          "item F:5e0cf881: Adjust your code to handle time zone changes for the daily summary."
+        ],
+        "questions_detail": [
+          "missed edge case: Will you test uploading files with real-world sizes to ensure the avatar upload limit is appropriate?",
+          "wrong assumption: How will you handle time zone changes to ensure the daily summary is sent at the correct hour?",
+          "state or concurrency bug: Do you plan to make your webhook handlers idempotent to prevent double charging customers?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 1,
+        "dropped_share": 0.0,
+        "category_coverage": 0.5,
+        "questions": 3,
+        "drafts": 6,
+        "seconds": 9.2,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Avatar upload rejected large photos",
+          "Daily report sent at the wrong hour after the clocks changed",
+          "Same webhook charged a customer twice"
+        ],
+        "drafts_detail": [
+          "gap F:fead89aa: It's not clear how you plan to handle webhook retries to prevent state or concurrency bugs.",
+          "gap F:958795c7: It's not specified how you will account for daylight savings and time zone changes to ensure the daily summary is sent at the correct hour.",
+          "gap F:f1fbbddb: It's not clear how you will handle large photo uploads to avoid rejections.",
+          "item F:fead89aa: Implement idempotent webhook handlers to prevent state or concurrency bugs.",
+          "item F:958795c7: Schedule the daily summary in the merchant's time zone, not a fixed offset.",
+          "item F:f1fbbddb: Test uploads with real-world file sizes."
+        ],
+        "questions_detail": [
+          "missed edge case: Will you test uploads with real-world file sizes to avoid rejecting large photos like in F:f1fbbddb?",
+          "wrong assumption: How will you handle the webhook retries from the processor, given that they can cause state or concurrency bugs as in F:fead89aa?",
+          "wrong assumption: What measures are you taking to ensure the daily summary is sent at the correct hour, accounting for daylight savings and time zone changes like in F:958795c7?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 1,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 5,
+        "seconds": 7.7,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Avatar upload rejected large photos",
+          "Daily report sent at the wrong hour after the clocks changed",
+          "Same webhook charged a customer twice"
+        ],
+        "drafts_detail": [
+          "gap REQ:3: It is not clear how you will handle retried webhooks that fail with a response other than 2xx.",
+          "gap REQ:1: There is no requirement to handle refunded payment events.",
+          "item F:4126c97e: Implement idempotency in the webhook handler to prevent double charging customers.",
+          "item F:02ff8228: Schedule the daily summary in the merchant's time zone instead of a fixed offset.",
+          "item F:a22fb813: Test uploading photos with real-world file sizes to ensure the avatar upload limit is appropriate."
+        ],
+        "questions_detail": [
+          "missed edge case: Will you test uploading photos with real-world file sizes to ensure the avatar upload limit is appropriate?",
+          "wrong assumption: How will you handle time zone differences when sending daily summaries to merchants?",
+          "state or concurrency bug: Do you plan to make the webhook handler idempotent to prevent double charging customers?"
+        ]
+      }
+    ],
+    "vendor-csv-import": [
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.3333333333333333,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 4,
+        "seconds": 8.5,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Import crashed on a file with a byte order mark",
+          "Import job ran out of memory on a large file"
+        ],
+        "drafts_detail": [
+          "gap REQ:3: It seems there is no plan for handling potential encoding issues in Excel files.",
+          "gap REQ:2: There is no mention of a strategy to handle large CSV files without loading them entirely into memory.",
+          "item REQ:2: Implement a strategy to handle large CSV files without loading them entirely into memory.",
+          "item REQ:3: Ensure your parsers can handle byte order marks and other encodings in Excel files."
+        ],
+        "questions_detail": [
+          "wrong approach: How will you handle large files (several gigabytes) to avoid running out of memory?",
+          "missed edge case: Do you have a plan for handling Excel files with byte order marks in their headers?",
+          "state or concurrency bug: How will you ensure that token refresh operations are serialized to avoid race conditions between tabs?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 1,
+        "dropped_share": 0.16666666666666666,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 5,
+        "seconds": 9.7,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Import crashed on a file with a byte order mark",
+          "Import job ran out of memory on a large file",
+          "OAuth token refresh raced between two tabs"
+        ],
+        "drafts_detail": [
+          "gap REQ:3: It seems there is no plan for handling potential encoding issues during import.",
+          "gap REQ:2: There is no mention of a strategy for handling large files to prevent running out of memory.",
+          "item F:2516574e: Ensure large files are processed row by row to avoid loading the whole file into memory.",
+          "item F:e3a3181f: Implement a parser that can handle byte order marks and other encodings to avoid crashes.",
+          "item F:4d015e7d: Use a serialization mechanism to ensure that token refresh operations are executed one at a time."
+        ],
+        "questions_detail": [
+          "wrong approach: How will you handle large files (several gigabytes) to avoid running out of memory?",
+          "missed edge case: Do you have a plan for handling Excel files with byte order marks (BOMs) during import?",
+          "state or concurrency bug: How will you ensure that token refresh operations are serialized to avoid race conditions between tabs?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.16666666666666666,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 5,
+        "seconds": 8.4,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Import crashed on a file with a byte order mark",
+          "Import job ran out of memory on a large file"
+        ],
+        "drafts_detail": [
+          "gap REQ:3: It seems there is no plan for handling potential encoding issues in Excel files.",
+          "gap REQ:2: There is no mention of a strategy to handle large CSV files without loading them entirely into memory.",
+          "gap REQ:4: It's unclear how you will handle rows with missing SKUs and report them to the vendor.",
+          "item REQ:2: Implement a strategy for handling large CSV files without loading them entirely into memory.",
+          "item REQ:3: Ensure your parsers can handle byte order marks and other potential encodings in Excel files."
+        ],
+        "questions_detail": [
+          "wrong approach: How will you handle large files (several gigabytes) to avoid running out of memory?",
+          "missed edge case: Do you have a plan for handling Excel files with byte order marks in their headers?",
+          "state or concurrency bug: How will you ensure that token refresh operations are serialized to avoid race conditions between tabs?"
+        ]
+      }
+    ],
+    "reminder-scheduler": [
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 1,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 5,
+        "seconds": 7.8,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Cron job ran twice after a deploy",
+          "Database migration locked the orders table",
+          "Notifications shifted an hour at daylight saving"
+        ],
+        "drafts_detail": [
+          "gap REQ:2: It's not clear how you plan to handle time zones for users who are in different time zones.",
+          "gap REQ:4: It seems that the service will run as two instances behind a load balancer. Have you considered how this might affect the scheduling of push reminders?",
+          "item F:c3e877dc: Review the code for the scheduler and ensure that only one instance is running at any given time.",
+          "item F:5b6011f8: Test database migrations with the CONCURRENTLY keyword to avoid table locks.",
+          "item F:344c1957: Store the time zone name for each user instead of their UTC offset."
+        ],
+        "questions_detail": [
+          "state or concurrency bug: How will you ensure that only one instance is running the scheduler for sending push reminders?",
+          "knowledge gap: Do you plan to add any indexes during database migrations? If so, how will you prevent table locks?",
+          "wrong assumption: Are you storing the time zone name for each user or just their UTC offset? If the latter, consider changing your approach."
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 0.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.3333333333333333,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 4,
+        "seconds": 8.7,
+        "cost_usd": 0.0,
+        "cited_failures": [],
+        "drafts_detail": [
+          "gap REQ:3: It seems that you have not specified how the service will handle retries when a push fails.",
+          "gap REQ:4: There is no mention of how the load balancer will distribute traffic between the two instances.",
+          "item REQ:3: Specify a retry strategy for failed push notifications.",
+          "item REQ:4: Detail how the load balancer distributes traffic between instances."
+        ],
+        "questions_detail": [
+          "state or concurrency bug: How will you ensure that only one instance is running the scheduler for sending push reminders?",
+          "knowledge gap: Do you plan to add any indexes during database migrations? If so, how will you prevent table locks?",
+          "wrong assumption: How will you handle the shift in local times due to daylight saving or time zone changes for the push reminders?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 0.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 1.0,
+        "category_coverage": 1.0,
+        "questions": 3,
+        "drafts": 0,
+        "seconds": 8.1,
+        "cost_usd": 0.0,
+        "cited_failures": [],
+        "drafts_detail": [],
+        "questions_detail": [
+          "state or concurrency bug: How will you ensure that only one instance is running the scheduler for sending push reminders?",
+          "knowledge gap: Have you considered adding CONCURRENTLY when creating any database migrations to avoid locking tables?",
+          "wrong assumption: How will you handle the time zone differences for users in different time zones, ensuring notifications are sent at 9am local time and not shifted due to daylight saving?"
+        ]
+      }
+    ]
+  }
+}
