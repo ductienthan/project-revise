@@ -1,0 +1,314 @@
+{
+  "model": "ollama:gemma4:12b",
+  "trials": 3,
+  "results": {
+    "llm-gateway": [
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 19.1,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Budget counter lost updates under load",
+          "Retry loop hung for 40 minutes"
+        ],
+        "drafts_detail": [
+          "gap F:b3cc8911: The plan lacks a defined timeout and retry cap for external provider calls.",
+          "gap F:f08ccaa2: Concurrency strategy for updating user spend is not specified.",
+          "item F:b3cc8911: Implement a hard timeout and maximum retry cap for all external provider calls.",
+          "item F:f08ccaa2: Use atomic operations or locks for updating user budget counters."
+        ],
+        "questions_detail": [
+          "missed edge case: What are the specific timeout limits and maximum retry counts for the provider calls in REQ:2?",
+          "state or concurrency bug: How will you ensure that the budget updates in REQ:4 are handled as atomic operations to prevent lost updates under load?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 12.4,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Budget counter lost updates under load",
+          "Retry loop hung for 40 minutes"
+        ],
+        "drafts_detail": [
+          "gap F:6a86e02e: The plan lacks a defined timeout and retry cap for provider calls, risking a hung process.",
+          "gap F:f0ffd584: The mechanism for atomic updates on the shared user budget counter is not specified.",
+          "item F:6a86e02e: Implement a hard timeout and maximum retry cap for all external provider calls.",
+          "item F:f0ffd584: Use atomic operations or locks for updating the user budget counter."
+        ],
+        "questions_detail": [
+          "missed edge case: What are the specific timeout limits and maximum retry counts for the provider calls in REQ:2?",
+          "state or concurrency bug: How will you ensure that the budget updates in REQ:4 are performed as atomic operations to prevent lost updates under load?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 12.7,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Budget counter lost updates under load",
+          "Retry loop hung for 40 minutes"
+        ],
+        "drafts_detail": [
+          "gap REQ:2: The plan lacks a defined timeout and retry cap for external provider calls.",
+          "gap REQ:4: Concurrency strategy for updating the shared user budget counter is not specified.",
+          "item REQ:2: Implement a hard timeout and maximum retry cap for all provider calls.",
+          "item REQ:4: Use atomic operations or locks to update the user's monthly budget counter."
+        ],
+        "questions_detail": [
+          "missed edge case: What are the specific timeout limits and maximum retry counts for the provider calls in REQ:2?",
+          "state or concurrency bug: How will you ensure that the user spend updates in REQ:4 are handled atomically under concurrent requests?"
+        ]
+      }
+    ],
+    "payments-webhooks": [
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 13.1,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Daily report sent at the wrong hour after the clocks changed",
+          "Same webhook charged a customer twice"
+        ],
+        "drafts_detail": [
+          "gap F:ee47e8e7: The plan lacks a specific mechanism for deduplicating incoming webhooks based on unique event IDs.",
+          "gap F:f3a3dc26: The logic for 'merchant's time zone' needs a specific implementation to avoid fixed UTC offset errors.",
+          "item F:ee47e8e7: Implement idempotency checks using unique event IDs for all incoming webhooks.",
+          "item F:f3a3dc26: Verify that the scheduling logic uses local time zones rather than fixed UTC offsets for REQ:4."
+        ],
+        "questions_detail": [
+          "state or concurrency bug: How will the handler for REQ:1 ensure that a retried webhook from the processor (REQ:3) does not result in duplicate records?",
+          "wrong assumption: For REQ:4, how is the system calculating '8am' to ensure it remains correct regardless of local daylight savings or time zone shifts?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 13.5,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Daily report sent at the wrong hour after the clocks changed",
+          "Same webhook charged a customer twice"
+        ],
+        "drafts_detail": [
+          "gap REQ:3: The plan lacks a specific mechanism to deduplicate incoming webhooks based on unique event IDs from the processor.",
+          "gap REQ:4: The plan does not specify how merchant time zones are stored or mapped for the 8am summary.",
+          "item F:cac1fd70: Implement idempotency logic in the webhook handler using a unique event ID from the processor.",
+          "item F:5632f9d1: Verify that the scheduling engine uses local time zones for merchant reports instead of fixed UTC offsets."
+        ],
+        "questions_detail": [
+          "state or concurrency bug: How will the handler for REQ:1 ensure that a retried webhook from the processor (REQ:3) does not result in duplicate records?",
+          "wrong assumption: Does the scheduling logic for REQ:4 account for local time zone offsets rather than a fixed UTC offset to handle DST changes?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 13.5,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Daily report sent at the wrong hour after the clocks changed",
+          "Same webhook charged a customer twice"
+        ],
+        "drafts_detail": [
+          "gap F:1e7416c8: The plan lacks a specific mechanism for deduplicating incoming webhooks based on unique event IDs.",
+          "gap F:4be3807a: The plan does not specify how to handle the transition between time zones or DST for the 8am summary.",
+          "item F:1e7416c8: Implement a deduplication check using the unique event ID from the processor for all incoming webhooks.",
+          "item F:4be3807a: Verify that the scheduling logic for REQ:4 uses the merchant's local time zone rather than a fixed UTC offset."
+        ],
+        "questions_detail": [
+          "state or concurrency bug: How will the handler for REQ:1 ensure that a retried webhook from the processor (REQ:3) does not result in duplicate records?",
+          "wrong assumption: For REQ:4, how is the system calculating '8am' to ensure it remains correct regardless of local daylight savings or regional offsets?"
+        ]
+      }
+    ],
+    "vendor-csv-import": [
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 13.1,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Import crashed on a file with a byte order mark",
+          "Import job ran out of memory on a large file"
+        ],
+        "drafts_detail": [
+          "gap F:98521c1e: The plan does not specify a mechanism to handle encoding or BOM issues common in Excel-generated CSVs.",
+          "gap F:ebe3c384: The plan lacks a strategy for memory-efficient processing of the multi-gigabyte files mentioned in REQ:2.",
+          "item F:98521c1e: Verify that the CSV parser is configured to handle Byte Order Marks (BOM).",
+          "item F:ebe3c384: Implement a row-by-row streaming buffer for processing files larger than 1GB."
+        ],
+        "questions_detail": [
+          "wrong approach: How does the implementation plan for REQ:2 ensure that files of several gigabytes are processed as a stream rather than loaded into memory at once?",
+          "missed edge case: Does the CSV parsing logic specifically account for Byte Order Marks (BOM) when processing files from Excel exports (REQ:3)?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 12.9,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Import crashed on a file with a byte order mark",
+          "Import job ran out of memory on a large file"
+        ],
+        "drafts_detail": [
+          "gap REQ:2: The plan does not specify a streaming mechanism to process large files row-by-row instead of loading them into memory.",
+          "gap REQ:3: The plan lacks a specific encoding/BOM handling strategy for Excel-sourced files.",
+          "item F:bc5e9b86: Implement a streaming reader to process large files row-by-row.",
+          "item F:e18767c2: Add a pre-processing step or library configuration to strip/handle Byte Order Marks (BOM)."
+        ],
+        "questions_detail": [
+          "wrong approach: How does the implementation plan for REQ:2 handle memory constraints when processing files that are several gigabytes in size?",
+          "missed edge case: Does the CSV parsing logic specifically account for Byte Order Marks (BOM) when handling files from Excel exports as mentioned in REQ:3?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 12.4,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Import crashed on a file with a byte order mark",
+          "Import job ran out of memory on a large file"
+        ],
+        "drafts_detail": [
+          "gap F:a8f469d8: The plan does not specify how to handle encoding or BOM issues common in Excel exports.",
+          "gap REQ:2: The processing logic for multi-gigabyte files is not defined.",
+          "item F:5156fd03: Implement a streaming row-by-row parser for all incoming CSV files.",
+          "item F:a8f469d8: Verify that the CSV parsing library handles Byte Order Marks (BOM)."
+        ],
+        "questions_detail": [
+          "wrong approach: How will the system process files that are several gigabytes in size without loading the entire file into memory? (F:5156fd03)",
+          "missed edge case: Does the CSV parser specifically handle Byte Order Marks (BOM) for files exported from Excel? (F:a8f469d8)"
+        ]
+      }
+    ],
+    "reminder-scheduler": [
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 13.5,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Cron job ran twice after a deploy",
+          "Notifications shifted an hour at daylight saving"
+        ],
+        "drafts_detail": [
+          "gap F:1e5f6188: The plan does not specify a mechanism for distributed locking or unique job ownership across multiple instances.",
+          "gap F:f9cdfebd: The requirement for 'local time' (REQ:2) lacks a specification on how timezone transitions are handled.",
+          "item F:1e5f6188: Implement a distributed lock or unique job claim mechanism for the push service.",
+          "item F:f9cdfebd: Verify that user timezone data is stored as a name (e.g., 'America/New_York') rather than an offset."
+        ],
+        "questions_detail": [
+          "state or concurrency bug: How will you ensure that only one of the two instances (REQ:4) processes a specific user's push notification to prevent duplicate sends?",
+          "wrong assumption: When calculating '9am local time' (REQ:2), are you storing the timezone name rather than just an offset to handle daylight saving changes?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 13.9,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Cron job ran twice after a deploy",
+          "Notifications shifted an hour at daylight saving"
+        ],
+        "drafts_detail": [
+          "gap F:d7242090: The plan does not specify a mechanism to prevent concurrent execution of scheduled tasks across multiple instances.",
+          "gap F:c7ddd0a7: The method for handling time zone transitions (e.g., Daylight Savings) is not defined in the requirements.",
+          "item F:d7242090: Implement a distributed lock or leader election to ensure one instance owns the scheduler.",
+          "item F:c7ddd0a7: Verify that user time zones are stored as names (e.g., 'America/New_York') rather than UTC offsets."
+        ],
+        "questions_detail": [
+          "state or concurrency bug: How will you ensure that only one of the two instances (REQ:4) processes a specific user's push notification to prevent duplicate sends?",
+          "wrong assumption: When calculating '9am in the user's local time' (REQ:2), are you storing the timezone name rather than just an offset to handle DST changes?"
+        ]
+      },
+      {
+        "ok": true,
+        "recall": 1.0,
+        "irrelevant_cited": 0,
+        "dropped_share": 0.0,
+        "category_coverage": 1.0,
+        "questions": 2,
+        "drafts": 4,
+        "seconds": 14.2,
+        "cost_usd": 0.0,
+        "cited_failures": [
+          "Cron job ran twice after a deploy",
+          "Notifications shifted an hour at daylight saving"
+        ],
+        "drafts_detail": [
+          "gap F:19e760cb: The plan does not specify a mechanism to prevent concurrent execution of scheduled tasks across multiple instances.",
+          "gap F:1494cd57: The plan does not specify how the system handles time zone transitions (DST) for local time calculations.",
+          "item F:19e760cb: Implement a distributed lock or leader election to ensure only one instance handles the scheduler.",
+          "item F:1494cd57: Store the full time zone name (e.g., 'America/New_York') instead of a fixed UTC offset for user locations."
+        ],
+        "questions_detail": [
+          "state or concurrency bug: How will you ensure that only one of the two instances (REQ:4) processes a specific user's push notification to prevent duplicate sends?",
+          "wrong assumption: When calculating '9am local time' (REQ:2), are you storing the timezone name or just an offset to handle daylight saving shifts?"
+        ]
+      }
+    ]
+  }
+}

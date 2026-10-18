@@ -8,7 +8,7 @@ from preflight.core.errors import DomainError, NotFound
 from preflight.db.models import Project, RequirementVersion
 
 RESERVED_NAMES = frozenset(
-    {"new", "login", "logout", "auth", "drill", "report", "ui", "export", "search", "rules", "failures", "help", "project"}
+    {"new", "login", "logout", "auth", "drill", "report", "ui", "export", "import", "search", "rules", "failures", "help", "project"}
 )
 NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
 

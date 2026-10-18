@@ -6,9 +6,9 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from preflight.cli import queue
+from preflight.cli import importer, queue
 from preflight.cli.auth import auth, login, logout
-from preflight.cli.client import Client
+from preflight.cli.client import ApiError, Client
 from preflight.cli.project import project
 from preflight.core.projects import RESERVED_NAMES
 
@@ -208,6 +208,44 @@ def export(fmt: str, out: str | None) -> None:
         click.echo(f"Wrote {out}.")
     else:
         click.echo(text)
+
+
+@cli.command("import")
+@click.argument("path", type=click.Path(exists=True, dir_okay=False))
+@click.option("--create-projects/--no-create-projects", default=True, help="Create projects that do not exist yet.")
+def import_failures(path: str, create_projects: bool) -> None:
+    """Backfill past failures from a JSON list or a CSV file.
+
+    Columns: project, title, date (YYYY-MM-DD), and optionally what_happened, guessed_cause, root_cause, fix,
+    prevention, category, severity, minutes_lost, guess_correct. Importing the same file again adds nothing.
+    """
+    try:
+        parsed = importer.parse(Path(path).read_text(encoding="utf-8"), path)
+    except ValueError as err:
+        raise click.ClickException(str(err)) from None
+    client = Client()
+    existing = {p["name"] for p in client.get("/projects")}
+    created = skipped = 0
+    errors = list(parsed.errors)
+    for row in parsed.rows:
+        if row.project not in existing:
+            if not create_projects:
+                errors.append(f"{row.body['title']}: no project named '{row.project}'")
+                continue
+            client.post("/projects", json={"name": row.project})
+            existing.add(row.project)
+            click.echo(f"Created project {row.project}.")
+        try:
+            result = client.post(f"/projects/{row.project}/failures", json=row.body)
+        except ApiError as err:
+            errors.append(f"{row.body['title']}: {err.message}")
+            continue
+        created, skipped = created + result["created"], skipped + (not result["created"])
+    click.echo(f"Imported {created} failure(s). {skipped} were already there.")
+    for line in errors:
+        click.echo(f"  Skipped {line}", err=True)
+    if errors:
+        raise SystemExit(1)
 
 
 @cli.command()

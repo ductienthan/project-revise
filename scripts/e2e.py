@@ -18,7 +18,7 @@ import httpx
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from tests.fakes import FakeAnthropic, FixtureSite
+from tests.fakes import FakeAnthropic, FakeOllamaServer, FixtureSite
 from tests.test_links import ARTICLE, JS_SHELL
 
 PASSWORD = "e2e correct horse battery"
@@ -77,10 +77,10 @@ class Run:
         tokens = json.loads((Path(self.env["PREFLIGHT_CONFIG_DIR"]) / "credentials.json").read_text())[self.base]
         return {"Authorization": f"Bearer {tokens['access_token']}"}
 
-    def start_server(self) -> None:
+    def start_server(self, **env: str) -> None:
         self.server = subprocess.Popen(
             ["uvicorn", "preflight.server.asgi:app", "--port", str(self.port)],
-            cwd=ROOT, env=self.env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            cwd=ROOT, env={**self.env, **env}, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
         for _ in range(100):
             try:
@@ -240,6 +240,8 @@ def scenario(run: Run) -> None:
     ai_review(run)
     close_and_report(run, web)
     practice(run)
+    backfill(run)
+    ollama_fallback(run)
 
     home = web.get("/")
     run.ok(home.status_code == 200 and 'href="/projects/llm-gateway"' in home.text, "dashboard lists projects")
@@ -346,6 +348,45 @@ def practice(run: Run) -> None:
     run.cli("next-thing", "resolve", prediction, "wrong")
     run.ok("wrong" in run.cli("next-thing", "predictions"), "a prediction is recorded and closed")
     run.ok("Calibration gap: +80% over 1 predictions" in run.cli("report"), "calibration shows in the report")
+
+
+def backfill(run: Run) -> None:
+    rows = run.workdir / "old-failures.csv"
+    rows.write_text(
+        "project,title,date,category,severity,minutes_lost,root_cause,prevention\n"
+        "legacy-api,Pagination skipped the last page,2025-11-03,missed edge case,medium,30,Off-by-one on the cursor,Test the last page\n"
+        "legacy-api,Bad date row,11/04/2025,,,,,\n"
+        "legacy-api,Cache never expired,2025-11-20,wrong assumption,high,90,TTL was in ms not s,Check TTL units\n"
+    )
+    out = run.cli("import", str(rows), expect=1)
+    run.ok("Created project legacy-api." in out and "Imported 2 failure(s). 0 were already there." in out, "a CSV backfill imports good rows", out)
+    run.ok("Skipped row 3: date '11/04/2025' is not YYYY-MM-DD" in out, "a bad row is reported with its line number", out)
+    out = run.cli("import", str(rows), expect=1)
+    run.ok("Imported 0 failure(s). 2 were already there." in out, "importing the same file twice adds nothing", out)
+    found = run.cli("search", "Pagination", "--project", "legacy-api")
+    run.ok("2025-11-03" in found, "backfilled failures keep their original dates", found)
+
+
+def ollama_fallback(run: Run) -> None:
+    ollama = FakeOllamaServer()
+    run.stop_server()
+    run.start_server(PREFLIGHT_ANTHROPIC_API_KEY="", PREFLIGHT_OLLAMA_URL=ollama.url)
+    try:
+        req = run.workdir / "local-req.md"
+        req.write_text("Sync contacts every hour.\nRetry failed syncs.\n")
+        run.cli("new", "local-ai", "--requirements", str(req), "--no-input")
+        before = len(run.anthropic.requests)
+        out = run.cli("local-ai", "start", input="y\ny\n" + "\n\n\n" + "y\ny\n" + "d\n" * 20)
+        run.ok("Will be sent to your Ollama model (fake-local:7b, no cost)" in out, "with no Anthropic key the review goes to local Ollama", out)
+        run.ok("Q1 (missed edge case)" in out and "Checklist (" in out, "the Ollama review produces questions and a checklist", out)
+        run.ok(len(run.anthropic.requests) == before and ollama.chats, "nothing was sent to Anthropic")
+        sent = ollama.chats[-1]
+        run.ok(sent["format"]["type"] == "object" and "REQ:1 Sync contacts every hour." in sent["messages"][1]["content"],
+               "Ollama received the approved material with the output schema")
+    finally:
+        run.stop_server()
+        ollama.close()
+        run.start_server()
 
 
 def ai_review(run: Run) -> None:

@@ -5,6 +5,7 @@ import re
 import pytest
 
 from preflight.ai.client import AIError, AnthropicClient
+from preflight.ai.prompts.review import REVIEW
 from preflight.ai.schemas import ReviewOutput, strict_schema
 from preflight.db.models import AiCall
 from tests.fakes import FakeAnthropic
@@ -51,7 +52,7 @@ def test_only_approved_items_are_sent_and_the_payload_is_logged(app, ready, ai):
     assert "Retry loop hung" not in text and "LLM proxy" not in text
     with app.state.sessionmaker() as db:
         call = db.query(AiCall).one()
-    assert call.approved_items == ["req:v1"] and call.prompt_version == "review-v1" and call.model == "claude-opus-5-5"
+    assert call.approved_items == ["req:v1"] and call.prompt_version == REVIEW.version and call.model == "claude-opus-5-5"
     assert "REQ:2" in call.payload and "Retry loop hung" not in call.payload
     assert call.cost_usd == pytest.approx((1000 * 4 + 200 * 20) / 1_000_000)
 

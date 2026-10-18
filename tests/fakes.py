@@ -130,3 +130,40 @@ class FixtureSite:
 
     def close(self):
         self.server.shutdown()
+
+
+class FakeOllamaServer:
+    """A local HTTP server that answers /api/tags and /api/chat like Ollama, recording every chat."""
+
+    def __init__(self, model: str = "fake-local:7b"):
+        self.chats: list[dict] = []
+        fake = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def _send(self, payload: dict) -> None:
+                data = json.dumps(payload).encode()
+                self.send_response(200)
+                self.send_header("content-type", "application/json")
+                self.send_header("content-length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def do_GET(self):
+                self._send({"models": [{"name": model, "size": 4_000_000_000}]})
+
+            def do_POST(self):
+                body = json.loads(self.rfile.read(int(self.headers["content-length"])))
+                fake.chats.append(body)
+                text = reply_for(body["format"], body["messages"][1]["content"])
+                self._send({"model": body["model"], "message": {"role": "assistant", "content": text},
+                            "done_reason": "stop", "prompt_eval_count": 800, "eval_count": 150})
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.server.shutdown()
