@@ -3,6 +3,6 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 uv run ruff check src tests scripts
-uv run pytest -q
 PREFLIGHT_DATABASE_URL="sqlite:///$(mktemp -d)/migration.db" uv run python scripts/check_review_migration.py
-uv run python scripts/e2e.py | tail -1
+uv run python scripts/validate_requirements.py
+uv run python scripts/mutation_check.py | tail -1

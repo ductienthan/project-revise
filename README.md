@@ -35,8 +35,17 @@ To sign in without a browser, run `preflight login --password`. It asks for the 
 ## Check it
 
 ```sh
-./scripts/check.sh                # lint, tests, and the end-to-end check; run before every commit
+./scripts/check.sh                # run before every commit, about two minutes
 ```
+
+It runs four things, and stops at the first failure:
+
+1. `ruff` on the source, tests, and scripts.
+2. `scripts/check_review_migration.py`, which proves the data migration round trip on a throwaway database.
+3. `scripts/validate_requirements.py`, which runs the test suite and the end-to-end check once and checks every requirement against them. `validation/requirements.json` maps each requirement in `docs/requirements.md` and `docs/design.md` to the tests and end-to-end checks that prove it. The script fails when a requirement in the document has no entry, when an entry marked met has no evidence or cites a test that does not exist, or when any cited evidence fails. Open and superseded items must give a reason. It writes `validation/report.md`.
+4. `scripts/mutation_check.py`, which breaks 20 protections on purpose (the start gate, the AI approval gate, CSRF, data separation between accounts, the private-address guard, and others) in a throwaway copy of the code and confirms the tests catch every one.
+
+When you add or change a requirement, add or update its entry in `validation/requirements.json`. When you add a protection, add a mutation for it.
 
 `scripts/e2e.py` runs the real migration, server, CLI binary, and dashboard forms. It points the server at a local fake of the Anthropic Messages API, so it needs no API key and spends nothing.
 
