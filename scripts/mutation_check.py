@@ -40,7 +40,7 @@ MUTATIONS = [
     Mutation("FR-13 only approved items are sent", "ai/gate.py",
              "return [item for item in items if item.id in approved_ids]", "return list(items)",
              ("test_review.py::test_only_approved_items_are_sent_and_the_payload_is_logged",)),
-    Mutation("PRIV-2 drafts cite only what their call saw", "core/review.py",
+    Mutation("PRIV-1 drafts cite only what their call saw", "core/review.py",
              "if entry.source_ref not in seen:", "if False:",
              ("test_review.py::test_drafts_must_cite_material_that_was_actually_sent",
               "test_review_findings_3.py::test_a_tag_typed_into_requirements_does_not_open_unapproved_history")),

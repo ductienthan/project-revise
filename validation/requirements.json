@@ -1,208 +1,966 @@
 [
-  {"id": "FR-1", "requirement": "Create a project with name, idea, goals, and requirements, from the CLI or the UI.", "status": "met",
-   "tests": ["test_capture.py::test_project_names_are_unique_and_slug_shaped", "test_dashboard.py::test_projects_can_be_created_and_requirements_edited_from_the_dashboard"],
-   "e2e": ["created project with requirements from a file"]},
-  {"id": "FR-2", "requirement": "Edit requirements at any time; every save creates a version with a timestamp.", "status": "met",
-   "tests": ["test_capture.py::test_requirements_are_versioned_and_identical_saves_are_ignored", "test_dashboard.py::test_projects_can_be_created_and_requirements_edited_from_the_dashboard"],
-   "e2e": ["editing requirements creates v2", "saving identical requirements does not create a version"]},
-  {"id": "FR-3", "requirement": "Show which requirements version the current checklist was built from.", "status": "met",
-   "tests": ["test_checklist.py::test_checklist_comes_from_history_with_sources_priorities_and_required_flags", "test_checklist.py::test_checklist_exports_as_markdown"],
-   "e2e": ["checklist built from history and v2"]},
-  {"id": "FR-4", "requirement": "Re-run the review when requirements or links change.", "status": "met",
-   "tests": ["test_review_freshness.py::test_a_review_goes_stale_when_links_or_history_change", "test_review_freshness.py::test_reviewing_a_started_project_adds_to_its_checklist_and_keeps_it_started"],
-   "e2e": ["changed requirements are flagged when reviewing again", "a started project's checklist is refreshed by a new review"]},
-  {"id": "FR-5", "requirement": "Save any link with URL, title, note, and type (internal or public).", "status": "met",
-   "tests": ["test_links.py::test_internal_links_are_never_fetched", "test_links.py::test_links_need_a_full_url"],
-   "e2e": ["links list shows types, notes and snapshots"]},
-  {"id": "FR-6", "requirement": "Internal links are never fetched; they are references only.", "status": "met",
-   "tests": ["test_links.py::test_internal_links_are_never_fetched"],
-   "e2e": ["internal link saved as a reference without fetching"]},
-  {"id": "FR-7", "requirement": "Public links can be captured as text snapshots (title, headings, main text, tables).", "status": "met",
-   "tests": ["test_links.py::test_public_capture_keeps_headings_and_tables_and_waits_for_approval"],
-   "e2e": ["public page captured, previewed and approved"]},
-  {"id": "FR-8", "requirement": "Capture tries a plain fetch first and uses a headless browser only when the page needs JavaScript.", "status": "met",
-   "tests": ["test_browser.py::test_capture_uses_the_browser_only_when_enabled", "test_browser.py::test_the_browser_renders_javascript_and_every_request_passes_the_guard", "test_links.py::test_javascript_pages_point_to_the_browser_extra"],
-   "e2e": ["a JavaScript-only page points to the browser extra"],
-   "note": "The browser fallback is off by default (PREFLIGHT_CAPTURE_BROWSER) because a browser resolves DNS itself. The browser tests skip where the extra is not installed."},
-  {"id": "FR-9", "requirement": "If a page needs a login, capture stops, tells me, and saves the link as a reference only.", "status": "met",
-   "tests": ["test_links.py::test_pages_behind_a_login_are_skipped_and_kept_as_references", "test_links.py::test_an_auth_word_in_a_docs_path_is_not_a_login_wall"],
-   "e2e": ["a login redirect is detected and skipped"]},
-  {"id": "FR-10", "requirement": "Show a preview of every snapshot. I can edit or delete it.", "status": "met",
-   "tests": ["test_links.py::test_snapshots_can_be_edited_and_deleted", "test_dashboard.py::test_snapshot_page_previews_edits_approves_and_deletes"],
-   "e2e": ["public page captured, previewed and approved"]},
-  {"id": "FR-11", "requirement": "Refreshing a link creates a new snapshot version; old versions are kept.", "status": "met",
-   "tests": ["test_links.py::test_refresh_adds_a_version_and_keeps_the_old_one"],
-   "e2e": ["refresh adds v2 and keeps v1"]},
-  {"id": "FR-12", "requirement": "Capture respects robots rules and rate-limits itself.", "status": "met",
-   "tests": ["test_links.py::test_robots_rules_are_respected", "test_links.py::test_capture_waits_between_requests_to_one_host", "test_review_findings_2.py::test_robots_redirects_are_followed_and_server_errors_block"],
-   "e2e": ["robots rules are respected"]},
-  {"id": "FR-13", "requirement": "start shows exactly what would be sent to AI, per item, and requires approval for each item.", "status": "met",
-   "tests": ["test_review_freshness.py::test_the_text_shown_for_approval_is_exactly_what_is_sent", "test_review.py::test_only_approved_items_are_sent_and_the_payload_is_logged"],
-   "e2e": ["each item is offered for approval", "an item's exact text can be viewed before approving", "an item that was not approved never left the server"]},
-  {"id": "FR-14", "requirement": "Items marked sensitive are never sent.", "status": "met",
-   "tests": ["test_review.py::test_unknown_or_sensitive_items_cannot_be_approved"], "e2e": []},
-  {"id": "FR-15", "requirement": "AI compares requirements, approved snapshots, and link notes with failure history and active rules.", "status": "met",
-   "tests": ["test_review.py::test_review_items_list_what_could_be_sent_with_an_estimate", "test_golden.py::test_review_payload_matches_the_golden_file", "test_links.py::test_public_capture_keeps_headings_and_tables_and_waits_for_approval"],
-   "e2e": ["approved items reached the model", "only the approved snapshot version is offered to AI"]},
-  {"id": "FR-16", "requirement": "AI asks targeted questions grouped by past failure category; answer, mark not relevant, or defer each.", "status": "met",
-   "tests": ["test_review.py::test_accepted_drafts_and_open_questions_join_the_checklist", "test_review.py::test_answered_questions_need_an_answer"],
-   "e2e": ["questions are grouped by past failure category"]},
-  {"id": "FR-17", "requirement": "AI lists gaps: requirements that are missing, unclear, or risky given my history.", "status": "met",
-   "tests": ["test_review.py::test_drafts_must_cite_material_that_was_actually_sent", "test_review.py::test_accepted_drafts_and_open_questions_join_the_checklist"],
-   "e2e": ["accepted gap and the open question are on the checklist"]},
-  {"id": "FR-18", "requirement": "Checklist is generated from failures, active rules, and gaps; each item shows its source.", "status": "met",
-   "tests": ["test_checklist.py::test_checklist_comes_from_history_with_sources_priorities_and_required_flags", "test_checklist.py::test_an_approved_rule_replaces_its_category_failures_on_the_checklist", "test_review.py::test_accepted_drafts_and_open_questions_join_the_checklist"],
-   "e2e": ["required items come from past failures", "accepted AI checklist item is on the checklist"]},
-  {"id": "FR-19", "requirement": "Each item has a status: not checked, done, not applicable, deferred.", "status": "met",
-   "tests": ["test_checklist.py::test_not_applicable_and_deferred_need_reasons_and_a_future_date", "test_checklist.py::test_project_starts_when_the_last_required_item_is_resolved"],
-   "e2e": ["resolving the last required item starts the project"]},
-  {"id": "FR-20", "requirement": "Not applicable and deferred items require a reason; deferred items require a revisit date.", "status": "met",
-   "tests": ["test_checklist.py::test_not_applicable_and_deferred_need_reasons_and_a_future_date"],
-   "e2e": ["not applicable without a reason is refused"]},
-  {"id": "FR-21", "requirement": "Items are marked required or optional.", "status": "met",
-   "tests": ["test_checklist.py::test_checklist_comes_from_history_with_sources_priorities_and_required_flags", "test_scoring.py::test_priority_bands"],
-   "e2e": ["checklist built from history and v2"]},
-  {"id": "FR-22", "requirement": "A project starts only when all required items are resolved; an override needs a typed reason, which is recorded.", "status": "met",
-   "tests": ["test_checklist.py::test_project_starts_when_the_last_required_item_is_resolved", "test_checklist.py::test_gate_override_needs_a_reason_and_is_recorded", "test_review_findings.py::test_checking_an_item_does_not_start_from_a_stale_checklist", "test_review_findings_3.py::test_a_tag_typed_into_requirements_does_not_open_unapproved_history"],
-   "e2e": ["gate blocks the start while required items are open", "resolving the last required item starts the project", "the gate can be overridden with a typed reason"]},
-  {"id": "FR-23", "requirement": "If I decline to send anything to AI, I still receive a checklist from failures and rules.", "status": "met",
-   "tests": ["test_review.py::test_without_ai_the_review_fails_clearly_and_the_rule_checklist_still_works", "test_review.py::test_unaccepted_drafts_are_not_saved"],
-   "e2e": ["checklist built from history and v2"]},
-  {"id": "FR-24", "requirement": "Log a failure with project, what happened, first guess, real cause, fix, prevention, category, severity, and time lost.", "status": "met",
-   "tests": ["test_capture.py::test_logging_a_failure_on_a_draft_project_is_allowed_and_reports_the_status", "test_capture.py::test_failure_fields_can_be_filled_in_later"],
-   "e2e": ["interactive fail shows the related checklist item", "one-line failure logging works with no prompts"]},
-  {"id": "FR-25", "requirement": "When logging a failure, show related checklist items; link one or mark it not on the checklist.", "status": "met",
-   "tests": ["test_checklist.py::test_failures_can_link_only_to_items_in_their_own_project", "test_capture.py::test_failure_can_be_marked_not_on_the_checklist"],
-   "e2e": ["interactive fail shows the related checklist item", "failure linked to the checklist item"]},
-  {"id": "FR-26", "requirement": "Show similar past failures when I log a new one.", "status": "met",
-   "tests": ["test_capture.py::test_similar_past_failures_are_shown_when_logging"],
-   "e2e": ["similar past failure is shown"]},
-  {"id": "FR-27", "requirement": "Log wins, optionally tagged.", "status": "met",
-   "tests": ["test_capture.py::test_wins_replay_idempotently", "test_metrics.py::test_wins_and_outcomes_are_counted_by_kind"],
-   "e2e": ["retrospective added the win and the late failure"]},
-  {"id": "FR-28", "requirement": "Record predictions (hypothesis, evidence planned, confidence) and close them with the outcome.", "status": "met",
-   "tests": ["test_practice.py::test_predictions_close_with_an_outcome_and_feed_calibration", "test_practice.py::test_a_prediction_links_only_to_a_failure_in_its_project"],
-   "e2e": ["a prediction is recorded and closed"]},
-  {"id": "FR-29", "requirement": "Logging a failure on a project that has not started prompts to start it first, but does not block logging.", "status": "met",
-   "tests": ["test_capture.py::test_logging_a_failure_on_a_draft_project_is_allowed_and_reports_the_status"], "e2e": []},
-  {"id": "FR-30", "requirement": "close runs a retrospective: wins, failures not yet logged, and whether each checklist item helped, was missed, or was irrelevant.", "status": "met",
-   "tests": ["test_progress.py::test_close_needs_a_summary_records_outcomes_and_shows_overrides"],
-   "e2e": ["close runs the retrospective and closes the project", "retrospective added the win and the late failure"]},
-  {"id": "FR-31", "requirement": "Closed-project data feeds pattern detection, rules, drills, and the dashboard.", "status": "met",
-   "tests": ["test_practice.py::test_closing_a_project_creates_one_drill_per_failure_with_a_cause", "test_progress.py::test_progress_numbers_match_the_data"],
-   "e2e": ["closing a project creates drills from its failures", "export reflects the closed project"]},
-  {"id": "FR-32", "requirement": "Whether the retrospective is required to close a project is configurable (default required).", "status": "met",
-   "tests": ["test_progress.py::test_close_needs_a_summary_records_outcomes_and_shows_overrides"], "e2e": [],
-   "note": "PREFLIGHT_RETROSPECTIVE_REQUIRED, default true."},
-  {"id": "FR-33", "requirement": "Detect repeated failures by category within a project and across projects.", "status": "met",
-   "tests": ["test_checklist.py::test_patterns_suggest_a_rule_drafted_from_prevention_notes"],
-   "e2e": ["repeated pattern is detected with a rule drafted from prevention notes"]},
-  {"id": "FR-34", "requirement": "When a pattern repeats, suggest a rule drafted from prevention notes; edit and approve it.", "status": "met",
-   "tests": ["test_checklist.py::test_patterns_suggest_a_rule_drafted_from_prevention_notes", "test_dashboard.py::test_rules_page_approves_a_suggested_rule"],
-   "e2e": ["repeated pattern is detected with a rule drafted from prevention notes", "a suggested rule can be approved"]},
-  {"id": "FR-35", "requirement": "Active rules appear in the checklist of any matching project.", "status": "met",
-   "tests": ["test_rule_matching.py::test_a_cross_project_rule_applies_to_every_project", "test_rule_matching.py::test_a_single_project_rule_applies_only_where_the_plan_looks_alike"],
-   "e2e": ["the rule replaces its failures on the next checklist"],
-   "note": "Matching is a default the requirements leave open: cross-project rules apply everywhere, single-project rules apply when the plan shares keywords with that pattern's failures."},
-  {"id": "FR-36", "requirement": "Each rule gets a verdict after an observation period: working, needs revision, or retired.", "status": "met",
-   "tests": ["test_progress.py::test_rule_verdict_is_given_after_the_observation_period", "test_metrics.py::test_rule_verdicts"],
-   "e2e": ["dashboard progress page shows the rule scoreboard"],
-   "note": "Working and needs revision are computed; retired is set by hand."},
-  {"id": "FR-37", "requirement": "Generate drills from failures on a spaced interval (1, 3, 7, 21 days; sooner when answered poorly).", "status": "met",
-   "tests": ["test_practice.py::test_intervals_climb_the_ladder_then_grow_by_ease", "test_practice.py::test_closing_a_project_creates_one_drill_per_failure_with_a_cause", "test_practice.py::test_self_scored_reviews_reschedule_and_feed_retention"],
-   "e2e": ["closing a project creates drills from its failures", "reviewed drills are not due again today"]},
-  {"id": "FR-38", "requirement": "Drill answers are graded by AI or self-graded.", "status": "met",
-   "tests": ["test_practice.py::test_self_scored_reviews_reschedule_and_feed_retention", "test_practice.py::test_ai_grading_sends_only_this_drill_and_the_attempt"],
-   "e2e": ["drills are self-scored or AI-graded and rescheduled"]},
-  {"id": "FR-39", "requirement": "Dashboard and weekly report.", "status": "met",
-   "tests": ["test_dashboard.py::test_progress_and_weekly_pages_render_numbers_with_a_table_view", "test_dashboard.py::test_progress_page_has_minutes_and_calibration_sections", "test_progress.py::test_weekly_report_covers_the_last_seven_days"],
-   "e2e": ["dashboard progress page shows the rule scoreboard", "dashboard weekly page loads", "weekly report lists this week's wins"]},
-  {"id": "FR-40", "requirement": "Export all data to CSV, JSON, and Markdown; the checklist exports as Markdown.", "status": "met",
-   "tests": ["test_progress.py::test_export_contains_my_data_and_no_auth_secrets", "test_checklist.py::test_checklist_exports_as_markdown"],
-   "e2e": ["JSON export has every data table and no auth tables", "CSV export is a zip of tables", "Markdown export includes the retrospective", "checklist exports as Markdown"]},
-
-  {"id": "MET-failures-per-project", "quote": "Failures per project", "status": "met", "tests": ["test_progress.py::test_progress_numbers_match_the_data"], "e2e": ["report shows progress with counts beside percentages"]},
-  {"id": "MET-repeat-rate", "quote": "Repeat rate", "status": "met", "tests": ["test_metrics.py::test_repeat_rate_counts_category_repeats_within_60_days", "test_progress.py::test_progress_numbers_match_the_data"], "e2e": []},
-  {"id": "MET-guess-accuracy", "quote": "Guess accuracy", "status": "met", "tests": ["test_metrics.py::test_guess_accuracy_uses_only_failures_with_both_recorded"], "e2e": []},
-  {"id": "MET-time-to-root-cause", "quote": "Time to root cause", "status": "met", "tests": ["test_metrics.py::test_median_hours_to_root_cause"], "e2e": []},
-  {"id": "MET-minutes-lost", "quote": "Minutes lost", "status": "met", "tests": ["test_metrics.py::test_minutes_lost_and_failures_are_grouped_by_monday_weeks", "test_dashboard.py::test_progress_page_has_minutes_and_calibration_sections"], "e2e": []},
-  {"id": "MET-checklist-coverage", "quote": "Checklist coverage", "status": "met", "tests": ["test_metrics.py::test_checklist_coverage_counts_items_resolved_before_the_start"], "e2e": []},
-  {"id": "MET-on-checklist", "quote": "On-checklist failure rate", "status": "met", "tests": ["test_metrics.py::test_on_checklist_missed_and_not_on_checklist"], "e2e": []},
-  {"id": "MET-missed-item", "quote": "Missed-item rate", "status": "met", "tests": ["test_metrics.py::test_on_checklist_missed_and_not_on_checklist"], "e2e": []},
-  {"id": "MET-not-on-checklist", "quote": "Not-on-checklist failures", "status": "met", "tests": ["test_metrics.py::test_on_checklist_missed_and_not_on_checklist"], "e2e": []},
-  {"id": "MET-question-coverage", "quote": "Question coverage", "status": "met", "tests": ["test_metrics.py::test_question_coverage_counts_answered_only"], "e2e": []},
-  {"id": "MET-wins-per-project", "quote": "Wins per project", "status": "met", "tests": ["test_metrics.py::test_wins_and_outcomes_are_counted_by_kind", "test_dashboard.py::test_progress_page_has_minutes_and_calibration_sections"], "e2e": []},
-  {"id": "MET-calibration-gap", "quote": "Calibration gap", "status": "met", "tests": ["test_metrics.py::test_calibration_gap_is_confidence_minus_accuracy", "test_metrics.py::test_calibration_by_month_uses_closed_predictions_only"], "e2e": ["calibration shows in the report"]},
-  {"id": "MET-drill-retention", "quote": "Drill retention", "status": "met", "tests": ["test_metrics.py::test_drill_retention_counts_scores_of_three_or_more"], "e2e": []},
-  {"id": "MET-rule-status", "quote": "Rule status", "status": "met", "tests": ["test_metrics.py::test_rule_status_counts_include_zeroes"], "e2e": []},
-
-  {"id": "PRIV-1", "quote": "All data is stored locally.", "status": "superseded",
-   "reason": "docs/design.md moves Preflight to a hosted service (Render and Neon). Data lives in the operator's own Postgres, and AI can run locally with Ollama."},
-  {"id": "PRIV-2", "quote": "Nothing is sent to AI without per-item approval at the time of each review. Approval is not remembered for later reviews.", "status": "met",
-   "tests": ["test_review.py::test_only_approved_items_are_sent_and_the_payload_is_logged", "test_review_findings_3.py::test_a_tag_typed_into_requirements_does_not_open_unapproved_history"],
-   "e2e": ["an item that was not approved never left the server"]},
-  {"id": "PRIV-3", "quote": "Items marked sensitive are never sent.", "status": "met",
-   "tests": ["test_review.py::test_unknown_or_sensitive_items_cannot_be_approved"], "e2e": []},
-  {"id": "PRIV-4", "quote": "Internal links are never fetched or sent; only title, URL, and note can be sent, with approval.", "status": "met",
-   "tests": ["test_links.py::test_internal_links_are_never_fetched", "test_batching.py::test_a_link_note_can_be_cited_now_that_its_tag_is_in_the_material"],
-   "e2e": ["internal link saved as a reference without fetching"]},
-  {"id": "PRIV-5", "quote": "The API key is read from an environment variable and never stored in the database.", "status": "met",
-   "tests": ["test_requirements_extra.py::test_no_table_can_store_an_api_key", "test_ollama.py::test_provider_choice"], "e2e": []},
-  {"id": "PRIV-6", "quote": "The local server binds to `127.0.0.1` only.", "status": "superseded",
-   "reason": "docs/design.md hosts the dashboard on the internet behind login, HTTPS, CSRF, lockout and optional TOTP. Run locally, uvicorn still binds 127.0.0.1 by default."},
-  {"id": "PRIV-7", "quote": "Captures and snapshots can be deleted at any time; deleting a project deletes its snapshots.", "status": "met",
-   "tests": ["test_links.py::test_snapshots_can_be_edited_and_deleted", "test_links.py::test_deleting_a_project_deletes_its_snapshots"], "e2e": []},
-
-  {"id": "NFR-1", "quote": "Logging a failure takes under one minute.", "status": "met",
-   "tests": ["test_review_findings.py::test_queue_keeps_entries_on_server_errors_and_drops_only_rejections"],
-   "e2e": ["one-line failure logging works with no prompts", "failure is queued when the server is down"],
-   "note": "One command with only a title; every other field can be skipped or filled in later."},
-  {"id": "NFR-2", "quote": "Single user; runs on one machine.", "status": "superseded",
-   "reason": "Single user holds. docs/design.md runs it as one hosted service with a CLI on any machine."},
-  {"id": "NFR-3", "quote": "The review finishes in reasonable time on long requirements (chunked reading).", "status": "met",
-   "tests": ["test_batching.py::test_long_documents_split_on_lines_and_every_call_keeps_the_context", "test_batching.py::test_a_long_review_runs_in_several_calls_and_merges_the_results", "test_review_findings_3.py::test_retrying_a_failed_multi_call_review_does_not_pay_for_finished_calls_again"],
-   "e2e": [], "note": "evals/results: about 13 to 16 seconds per review with gemma4:12b on local Ollama."},
-  {"id": "NFR-4", "quote": "Clear error messages: AI key missing, link unreachable, login required, capture failed.", "status": "met",
-   "tests": ["test_requirements_extra.py::test_a_missing_ai_key_gives_a_clear_message", "test_requirements_extra.py::test_an_unreachable_link_gives_a_clear_message", "test_links.py::test_pages_behind_a_login_are_skipped_and_kept_as_references", "test_links.py::test_javascript_pages_point_to_the_browser_extra"],
-   "e2e": ["a login redirect is detected and skipped"]},
-  {"id": "NFR-5", "quote": "Export is always available so data is never locked in.", "status": "met",
-   "tests": ["test_progress.py::test_export_contains_my_data_and_no_auth_secrets"], "e2e": ["JSON export has every data table and no auth tables"]},
-
-  {"id": "SUCCESS", "requirement": "Section 17 success measures (repeat rate falls, fewer failures, guess accuracy rises, logging for four weeks).", "status": "open",
-   "reason": "These are outcomes of real use. The metrics behind them are computed and tested (MET-*); the outcomes need weeks of the operator's own data."},
-
-  {"id": "DES-auth-web", "requirement": "design 6.1: Argon2 password, HttpOnly Secure SameSite session cookie, idle expiry, logout, lockout, CSRF, HTTPS, optional TOTP.", "status": "met",
-   "tests": ["test_auth.py::test_password_hash_is_argon2", "test_auth.py::test_login_sets_httponly_lax_session_cookie", "test_auth.py::test_session_expires_after_inactivity", "test_auth.py::test_logout_ends_the_session", "test_review_findings.py::test_an_attacker_cannot_lock_the_owner_out_from_another_address", "test_auth.py::test_cookie_requests_need_csrf_header_for_writes", "test_auth.py::test_https_is_enforced_when_configured", "test_auth.py::test_totp_is_required_once_enabled", "test_review_findings.py::test_totp_codes_cannot_be_replayed"],
-   "e2e": ["dashboard lists projects"]},
-  {"id": "DES-auth-cli", "requirement": "design 6.2-6.4: device flow login, per-device revocable tokens in the keyring or a 0600 file, hidden password fallback, CLI tokens cannot open the dashboard.", "status": "met",
-   "tests": ["test_auth.py::test_device_flow_issues_a_token_only_after_dashboard_approval", "test_auth.py::test_access_token_expires_and_refresh_rotates", "test_auth.py::test_revoking_a_device_kills_its_token_but_not_the_web_session", "test_auth.py::test_bearer_token_cannot_open_dashboard", "test_auth.py::test_password_is_not_an_api_token", "test_review_findings.py::test_token_file_is_tightened_even_if_it_already_existed"],
-   "e2e": ["CLI receives its device token", "token file is readable only by the owner", "the password is never stored by the CLI", "password fallback signs in a second device with a hidden prompt", "a revoked device is locked out", "a bearer token cannot open the dashboard"]},
-  {"id": "DES-ai-gate", "requirement": "design 7: one gate module, payload and reply logged with prompt version, JSON validated and retried once, budget, stronger model for reviews, smaller for the rest, works without a key.", "status": "met",
-   "tests": ["test_review.py::test_only_the_client_module_imports_the_sdk_and_only_the_gate_calls_it", "test_review.py::test_invalid_json_is_retried_once_then_reported", "test_review.py::test_monthly_budget_counts_each_call_at_its_worst_case", "test_review_findings_2.py::test_concurrent_calls_cannot_overspend_the_budget", "test_review_findings_2.py::test_every_call_is_logged_even_when_the_client_crashes", "test_review.py::test_anthropic_client_sends_schema_cache_and_fallbacks", "test_review.py::test_failure_classification_is_only_sent_when_approved"],
-   "e2e": ["review uses Opus 5.5 with refusal fallbacks", "failure history is the cached prefix", "classification uses the cheaper model"]},
-  {"id": "DES-ai-local", "requirement": "Operator request: without an Anthropic key, AI calls go to local Ollama.", "status": "met",
-   "tests": ["test_ollama.py::test_provider_choice", "test_ollama.py::test_a_review_runs_through_ollama_and_costs_nothing", "test_ollama.py::test_request_carries_the_schema_and_context_and_reply_is_parsed", "test_review_findings_3.py::test_ollama_refuses_input_longer_than_its_context_instead_of_truncating"],
-   "e2e": ["with no Anthropic key the review goes to local Ollama", "nothing was sent to Anthropic", "Ollama received the approved material with the output schema"]},
-  {"id": "DES-capture-safety", "requirement": "design 8 and 13: public capture only, private addresses refused, size and time limits.", "status": "met",
-   "tests": ["test_links.py::test_private_addresses_are_refused_even_through_a_redirect", "test_review_findings_2.py::test_capture_connects_to_the_address_it_checked", "test_review_findings_2.py::test_a_rebinding_answer_is_refused_before_connecting", "test_review_findings_2.py::test_capture_stops_reading_at_the_size_cap", "test_review_findings_2.py::test_capture_has_a_total_deadline", "test_links.py::test_large_snapshots_are_capped_and_flagged"],
-   "e2e": []},
-  {"id": "DES-data", "requirement": "design 9: Postgres and SQLite via SQLAlchemy, Alembic from day one, UUID keys, user_id on every table, full-text search.", "status": "met",
-   "tests": ["test_capture.py::test_search_matches_any_text_field_and_filters_by_project", "test_capture.py::test_other_users_cannot_see_or_touch_my_data", "test_metrics.py::test_stored_times_come_back_in_utc_so_day_arithmetic_ignores_dst"],
-   "e2e": ["alembic migration created the schema"],
-   "note": "check.sh runs the migration round trip; the suites also run on Postgres via PREFLIGHT_TEST_DATABASE_URL and PREFLIGHT_E2E_DATABASE_URL."},
-  {"id": "DES-offline", "requirement": "design 14: failures and wins queue offline and replay without duplicates; cold-start retry message.", "status": "met",
-   "tests": ["test_capture.py::test_replaying_a_failure_id_does_not_duplicate", "test_review_findings.py::test_queue_keeps_entries_on_server_errors_and_drops_only_rejections"],
-   "e2e": ["failure is queued when the server is down", "queue flushes on the next command", "replaying the same queue again does not duplicate"]},
-  {"id": "DES-testing", "requirement": "design 15: fake AI client, golden prompt tests, an evaluation set, metric unit tests, auth tests, gate tests.", "status": "met",
-   "tests": ["test_golden.py::test_review_payload_matches_the_golden_file", "test_review.py::test_drafts_must_cite_material_that_was_actually_sent"],
-   "e2e": [], "note": "scripts/eval_review.py with evals/review_cases.json; results in evals/results."},
-  {"id": "DES-backfill", "requirement": "design 18: backfill command to import old failures with past dates.", "status": "met",
-   "tests": ["test_import.py::test_csv_rows_are_parsed_and_bad_rows_reported_with_their_line", "test_import.py::test_replaying_imported_rows_adds_nothing", "test_review_findings_3.py::test_one_bad_json_row_does_not_abort_the_import"],
-   "e2e": ["a CSV backfill imports good rows", "importing the same file twice adds nothing", "backfilled failures keep their original dates"]},
-  {"id": "DES-deploy", "requirement": "design 12 and 17: deploy to Render Starter and Neon.", "status": "open",
-   "reason": "Needs the operator's Render and Neon accounts, and deploys always wait for the operator. README documents the proxy flags."},
-  {"id": "DES-backups", "requirement": "design 13: provider restore or a nightly dump, with one tested restore.", "status": "open",
-   "reason": "Depends on the chosen host (open decision 5 in docs/design.md)."},
-  {"id": "DES-live-claude", "requirement": "A real call to the Claude API.", "status": "open",
-   "reason": "No API key was available. The request format is verified against a local fake of the Messages API, and the Ollama path against a real local model."}
+ {
+  "id": "FR-1",
+  "status": "met",
+  "tests": [
+   "test_capture.py::test_project_names_are_unique_and_slug_shaped",
+   "test_dashboard.py::test_projects_can_be_created_and_requirements_edited_from_the_dashboard"
+  ],
+  "e2e": [
+   "created project with requirements from a file"
+  ]
+ },
+ {
+  "id": "FR-2",
+  "status": "met",
+  "tests": [
+   "test_capture.py::test_requirements_are_versioned_and_identical_saves_are_ignored",
+   "test_dashboard.py::test_projects_can_be_created_and_requirements_edited_from_the_dashboard"
+  ],
+  "e2e": [
+   "editing requirements creates v2",
+   "saving identical requirements does not create a version"
+  ]
+ },
+ {
+  "id": "FR-3",
+  "status": "met",
+  "tests": [
+   "test_checklist.py::test_checklist_comes_from_history_with_sources_priorities_and_required_flags",
+   "test_checklist.py::test_checklist_exports_as_markdown"
+  ],
+  "e2e": [
+   "checklist built from history and v2"
+  ]
+ },
+ {
+  "id": "FR-4",
+  "status": "met",
+  "tests": [
+   "test_review_freshness.py::test_a_review_goes_stale_when_links_or_history_change",
+   "test_review_freshness.py::test_reviewing_a_started_project_adds_to_its_checklist_and_keeps_it_started"
+  ],
+  "e2e": [
+   "changed requirements are flagged when reviewing again",
+   "a started project's checklist is refreshed by a new review"
+  ]
+ },
+ {
+  "id": "FR-5",
+  "status": "met",
+  "tests": [
+   "test_links.py::test_internal_links_are_never_fetched",
+   "test_links.py::test_links_need_a_full_url"
+  ],
+  "e2e": [
+   "links list shows types, notes and snapshots"
+  ]
+ },
+ {
+  "id": "FR-6",
+  "status": "met",
+  "tests": [
+   "test_links.py::test_internal_links_are_never_fetched"
+  ],
+  "e2e": [
+   "internal link saved as a reference without fetching"
+  ]
+ },
+ {
+  "id": "FR-7",
+  "status": "met",
+  "tests": [
+   "test_links.py::test_public_capture_keeps_headings_and_tables_and_waits_for_approval"
+  ],
+  "e2e": [
+   "public page captured, previewed and approved"
+  ]
+ },
+ {
+  "id": "FR-8",
+  "status": "met",
+  "tests": [
+   "test_browser.py::test_capture_uses_the_browser_only_when_enabled",
+   "test_browser.py::test_the_browser_renders_javascript_and_every_request_passes_the_guard",
+   "test_links.py::test_javascript_pages_point_to_the_browser_extra"
+  ],
+  "e2e": [
+   "a JavaScript-only page points to the browser extra"
+  ],
+  "note": "The browser fallback is off by default (PREFLIGHT_CAPTURE_BROWSER) because a browser resolves DNS itself. The browser tests skip where the extra is not installed."
+ },
+ {
+  "id": "FR-9",
+  "status": "met",
+  "tests": [
+   "test_links.py::test_pages_behind_a_login_are_skipped_and_kept_as_references",
+   "test_links.py::test_an_auth_word_in_a_docs_path_is_not_a_login_wall"
+  ],
+  "e2e": [
+   "a login redirect is detected and skipped"
+  ]
+ },
+ {
+  "id": "FR-10",
+  "status": "met",
+  "tests": [
+   "test_links.py::test_snapshots_can_be_edited_and_deleted",
+   "test_dashboard.py::test_snapshot_page_previews_edits_approves_and_deletes"
+  ],
+  "e2e": [
+   "public page captured, previewed and approved"
+  ]
+ },
+ {
+  "id": "FR-11",
+  "status": "met",
+  "tests": [
+   "test_links.py::test_refresh_adds_a_version_and_keeps_the_old_one"
+  ],
+  "e2e": [
+   "refresh adds v2 and keeps v1"
+  ]
+ },
+ {
+  "id": "FR-12",
+  "status": "met",
+  "tests": [
+   "test_links.py::test_robots_rules_are_respected",
+   "test_links.py::test_capture_waits_between_requests_to_one_host",
+   "test_review_findings_2.py::test_robots_redirects_are_followed_and_server_errors_block"
+  ],
+  "e2e": [
+   "robots rules are respected"
+  ]
+ },
+ {
+  "id": "FR-13",
+  "status": "met",
+  "tests": [
+   "test_review_freshness.py::test_the_text_shown_for_approval_is_exactly_what_is_sent",
+   "test_review.py::test_only_approved_items_are_sent_and_the_payload_is_logged"
+  ],
+  "e2e": [
+   "each item is offered for approval",
+   "an item's exact text can be viewed before approving",
+   "an item that was not approved never left the server"
+  ]
+ },
+ {
+  "id": "FR-14",
+  "status": "met",
+  "tests": [
+   "test_review.py::test_unknown_or_sensitive_items_cannot_be_approved"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "FR-15",
+  "status": "met",
+  "tests": [
+   "test_review.py::test_review_items_list_what_could_be_sent_with_an_estimate",
+   "test_golden.py::test_review_payload_matches_the_golden_file",
+   "test_links.py::test_public_capture_keeps_headings_and_tables_and_waits_for_approval"
+  ],
+  "e2e": [
+   "approved items reached the model",
+   "only the approved snapshot version is offered to AI"
+  ]
+ },
+ {
+  "id": "FR-16",
+  "status": "met",
+  "tests": [
+   "test_review.py::test_accepted_drafts_and_open_questions_join_the_checklist",
+   "test_review.py::test_answered_questions_need_an_answer"
+  ],
+  "e2e": [
+   "questions are grouped by past failure category"
+  ]
+ },
+ {
+  "id": "FR-17",
+  "status": "met",
+  "tests": [
+   "test_review.py::test_drafts_must_cite_material_that_was_actually_sent",
+   "test_review.py::test_accepted_drafts_and_open_questions_join_the_checklist"
+  ],
+  "e2e": [
+   "accepted gap and the open question are on the checklist"
+  ]
+ },
+ {
+  "id": "FR-18",
+  "status": "met",
+  "tests": [
+   "test_checklist.py::test_checklist_comes_from_history_with_sources_priorities_and_required_flags",
+   "test_checklist.py::test_an_approved_rule_replaces_its_category_failures_on_the_checklist",
+   "test_review.py::test_accepted_drafts_and_open_questions_join_the_checklist"
+  ],
+  "e2e": [
+   "required items come from past failures",
+   "accepted AI checklist item is on the checklist"
+  ]
+ },
+ {
+  "id": "FR-19",
+  "status": "met",
+  "tests": [
+   "test_checklist.py::test_not_applicable_and_deferred_need_reasons_and_a_future_date",
+   "test_checklist.py::test_project_starts_when_the_last_required_item_is_resolved"
+  ],
+  "e2e": [
+   "resolving the last required item starts the project"
+  ]
+ },
+ {
+  "id": "FR-20",
+  "status": "met",
+  "tests": [
+   "test_checklist.py::test_not_applicable_and_deferred_need_reasons_and_a_future_date"
+  ],
+  "e2e": [
+   "not applicable without a reason is refused"
+  ]
+ },
+ {
+  "id": "FR-21",
+  "status": "met",
+  "tests": [
+   "test_checklist.py::test_checklist_comes_from_history_with_sources_priorities_and_required_flags",
+   "test_scoring.py::test_priority_bands"
+  ],
+  "e2e": [
+   "checklist built from history and v2"
+  ]
+ },
+ {
+  "id": "FR-22",
+  "status": "met",
+  "tests": [
+   "test_checklist.py::test_project_starts_when_the_last_required_item_is_resolved",
+   "test_checklist.py::test_gate_override_needs_a_reason_and_is_recorded",
+   "test_review_findings.py::test_checking_an_item_does_not_start_from_a_stale_checklist",
+   "test_review_findings_3.py::test_a_tag_typed_into_requirements_does_not_open_unapproved_history"
+  ],
+  "e2e": [
+   "gate blocks the start while required items are open",
+   "resolving the last required item starts the project",
+   "the gate can be overridden with a typed reason"
+  ]
+ },
+ {
+  "id": "FR-23",
+  "status": "met",
+  "tests": [
+   "test_review.py::test_without_ai_the_review_fails_clearly_and_the_rule_checklist_still_works",
+   "test_review.py::test_unaccepted_drafts_are_not_saved"
+  ],
+  "e2e": [
+   "checklist built from history and v2"
+  ]
+ },
+ {
+  "id": "FR-24",
+  "status": "met",
+  "tests": [
+   "test_capture.py::test_logging_a_failure_on_a_draft_project_is_allowed_and_reports_the_status",
+   "test_capture.py::test_failure_fields_can_be_filled_in_later"
+  ],
+  "e2e": [
+   "interactive fail shows the related checklist item",
+   "one-line failure logging works with no prompts"
+  ]
+ },
+ {
+  "id": "FR-25",
+  "status": "met",
+  "tests": [
+   "test_checklist.py::test_failures_can_link_only_to_items_in_their_own_project",
+   "test_capture.py::test_failure_can_be_marked_not_on_the_checklist"
+  ],
+  "e2e": [
+   "interactive fail shows the related checklist item",
+   "failure linked to the checklist item"
+  ]
+ },
+ {
+  "id": "FR-26",
+  "status": "met",
+  "tests": [
+   "test_capture.py::test_similar_past_failures_are_shown_when_logging"
+  ],
+  "e2e": [
+   "similar past failure is shown"
+  ]
+ },
+ {
+  "id": "FR-27",
+  "status": "met",
+  "tests": [
+   "test_capture.py::test_wins_replay_idempotently",
+   "test_metrics.py::test_wins_and_outcomes_are_counted_by_kind"
+  ],
+  "e2e": [
+   "retrospective added the win and the late failure"
+  ]
+ },
+ {
+  "id": "FR-28",
+  "status": "met",
+  "tests": [
+   "test_practice.py::test_predictions_close_with_an_outcome_and_feed_calibration",
+   "test_practice.py::test_a_prediction_links_only_to_a_failure_in_its_project"
+  ],
+  "e2e": [
+   "a prediction is recorded and closed"
+  ]
+ },
+ {
+  "id": "FR-29",
+  "status": "met",
+  "tests": [
+   "test_capture.py::test_logging_a_failure_on_a_draft_project_is_allowed_and_reports_the_status"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "FR-30",
+  "status": "met",
+  "tests": [
+   "test_progress.py::test_close_needs_a_summary_records_outcomes_and_shows_overrides"
+  ],
+  "e2e": [
+   "close runs the retrospective and closes the project",
+   "retrospective added the win and the late failure"
+  ]
+ },
+ {
+  "id": "FR-31",
+  "status": "met",
+  "tests": [
+   "test_practice.py::test_closing_a_project_creates_one_drill_per_failure_with_a_cause",
+   "test_progress.py::test_progress_numbers_match_the_data"
+  ],
+  "e2e": [
+   "closing a project creates drills from its failures",
+   "export reflects the closed project"
+  ]
+ },
+ {
+  "id": "FR-32",
+  "status": "met",
+  "tests": [
+   "test_progress.py::test_close_needs_a_summary_records_outcomes_and_shows_overrides"
+  ],
+  "e2e": [],
+  "note": "PREFLIGHT_RETROSPECTIVE_REQUIRED, default true."
+ },
+ {
+  "id": "FR-33",
+  "status": "met",
+  "tests": [
+   "test_checklist.py::test_patterns_suggest_a_rule_drafted_from_prevention_notes"
+  ],
+  "e2e": [
+   "repeated pattern is detected with a rule drafted from prevention notes"
+  ]
+ },
+ {
+  "id": "FR-34",
+  "status": "met",
+  "tests": [
+   "test_checklist.py::test_patterns_suggest_a_rule_drafted_from_prevention_notes",
+   "test_dashboard.py::test_rules_page_approves_a_suggested_rule"
+  ],
+  "e2e": [
+   "repeated pattern is detected with a rule drafted from prevention notes",
+   "a suggested rule can be approved"
+  ]
+ },
+ {
+  "id": "FR-35",
+  "status": "met",
+  "tests": [
+   "test_rule_matching.py::test_a_cross_project_rule_applies_to_every_project",
+   "test_rule_matching.py::test_a_single_project_rule_applies_only_where_the_plan_looks_alike"
+  ],
+  "e2e": [
+   "the rule replaces its failures on the next checklist"
+  ],
+  "note": "Matching is a default the requirements leave open: cross-project rules apply everywhere, single-project rules apply when the plan shares keywords with that pattern's failures."
+ },
+ {
+  "id": "FR-36",
+  "status": "met",
+  "tests": [
+   "test_progress.py::test_rule_verdict_is_given_after_the_observation_period",
+   "test_metrics.py::test_rule_verdicts"
+  ],
+  "e2e": [
+   "dashboard progress page shows the rule scoreboard"
+  ],
+  "note": "Working and needs revision are computed; retired is set by hand."
+ },
+ {
+  "id": "FR-37",
+  "status": "met",
+  "tests": [
+   "test_practice.py::test_intervals_climb_the_ladder_then_grow_by_ease",
+   "test_practice.py::test_closing_a_project_creates_one_drill_per_failure_with_a_cause",
+   "test_practice.py::test_self_scored_reviews_reschedule_and_feed_retention"
+  ],
+  "e2e": [
+   "closing a project creates drills from its failures",
+   "reviewed drills are not due again today"
+  ]
+ },
+ {
+  "id": "FR-38",
+  "status": "met",
+  "tests": [
+   "test_practice.py::test_self_scored_reviews_reschedule_and_feed_retention",
+   "test_practice.py::test_ai_grading_sends_only_this_drill_and_the_attempt"
+  ],
+  "e2e": [
+   "drills are self-scored or AI-graded and rescheduled"
+  ]
+ },
+ {
+  "id": "FR-39",
+  "status": "met",
+  "tests": [
+   "test_dashboard.py::test_progress_and_weekly_pages_render_numbers_with_a_table_view",
+   "test_dashboard.py::test_progress_page_has_minutes_and_calibration_sections",
+   "test_progress.py::test_weekly_report_covers_the_last_seven_days"
+  ],
+  "e2e": [
+   "dashboard progress page shows the rule scoreboard",
+   "dashboard weekly page loads",
+   "weekly report lists this week's wins"
+  ]
+ },
+ {
+  "id": "FR-40",
+  "status": "met",
+  "tests": [
+   "test_progress.py::test_export_contains_my_data_and_no_auth_secrets",
+   "test_checklist.py::test_checklist_exports_as_markdown"
+  ],
+  "e2e": [
+   "JSON export has every data table and no auth tables",
+   "CSV export is a zip of tables",
+   "Markdown export includes the retrospective",
+   "checklist exports as Markdown"
+  ]
+ },
+ {
+  "id": "FR-41",
+  "status": "met",
+  "tests": [
+   "test_ollama.py::test_provider_choice",
+   "test_ollama.py::test_a_review_runs_through_ollama_and_costs_nothing",
+   "test_review.py::test_without_ai_the_review_fails_clearly_and_the_rule_checklist_still_works"
+  ],
+  "e2e": [
+   "with no Anthropic key the review goes to local Ollama",
+   "nothing was sent to Anthropic",
+   "Ollama received the approved material with the output schema"
+  ]
+ },
+ {
+  "id": "FR-42",
+  "status": "met",
+  "tests": [
+   "test_import.py::test_csv_rows_are_parsed_and_bad_rows_reported_with_their_line",
+   "test_import.py::test_replaying_imported_rows_adds_nothing",
+   "test_review_findings_3.py::test_one_bad_json_row_does_not_abort_the_import"
+  ],
+  "e2e": [
+   "a CSV backfill imports good rows",
+   "a bad row is reported with its line number",
+   "importing the same file twice adds nothing",
+   "backfilled failures keep their original dates"
+  ]
+ },
+ {
+  "id": "MET-failures-per-project",
+  "quote": "Failures per project",
+  "status": "met",
+  "tests": [
+   "test_progress.py::test_progress_numbers_match_the_data"
+  ],
+  "e2e": [
+   "report shows progress with counts beside percentages"
+  ]
+ },
+ {
+  "id": "MET-repeat-rate",
+  "quote": "Repeat rate",
+  "status": "met",
+  "tests": [
+   "test_metrics.py::test_repeat_rate_counts_category_repeats_within_60_days",
+   "test_progress.py::test_progress_numbers_match_the_data"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "MET-guess-accuracy",
+  "quote": "Guess accuracy",
+  "status": "met",
+  "tests": [
+   "test_metrics.py::test_guess_accuracy_uses_only_failures_with_both_recorded"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "MET-time-to-root-cause",
+  "quote": "Time to root cause",
+  "status": "met",
+  "tests": [
+   "test_metrics.py::test_median_hours_to_root_cause"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "MET-minutes-lost",
+  "quote": "Minutes lost",
+  "status": "met",
+  "tests": [
+   "test_metrics.py::test_minutes_lost_and_failures_are_grouped_by_monday_weeks",
+   "test_dashboard.py::test_progress_page_has_minutes_and_calibration_sections"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "MET-checklist-coverage",
+  "quote": "Checklist coverage",
+  "status": "met",
+  "tests": [
+   "test_metrics.py::test_checklist_coverage_counts_items_resolved_before_the_start"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "MET-on-checklist",
+  "quote": "On-checklist failure rate",
+  "status": "met",
+  "tests": [
+   "test_metrics.py::test_on_checklist_missed_and_not_on_checklist"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "MET-missed-item",
+  "quote": "Missed-item rate",
+  "status": "met",
+  "tests": [
+   "test_metrics.py::test_on_checklist_missed_and_not_on_checklist"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "MET-not-on-checklist",
+  "quote": "Not-on-checklist failures",
+  "status": "met",
+  "tests": [
+   "test_metrics.py::test_on_checklist_missed_and_not_on_checklist"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "MET-question-coverage",
+  "quote": "Question coverage",
+  "status": "met",
+  "tests": [
+   "test_metrics.py::test_question_coverage_counts_answered_only"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "MET-wins-per-project",
+  "quote": "Wins per project",
+  "status": "met",
+  "tests": [
+   "test_metrics.py::test_wins_and_outcomes_are_counted_by_kind",
+   "test_dashboard.py::test_progress_page_has_minutes_and_calibration_sections"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "MET-calibration-gap",
+  "quote": "Calibration gap",
+  "status": "met",
+  "tests": [
+   "test_metrics.py::test_calibration_gap_is_confidence_minus_accuracy",
+   "test_metrics.py::test_calibration_by_month_uses_closed_predictions_only"
+  ],
+  "e2e": [
+   "calibration shows in the report"
+  ]
+ },
+ {
+  "id": "MET-drill-retention",
+  "quote": "Drill retention",
+  "status": "met",
+  "tests": [
+   "test_metrics.py::test_drill_retention_counts_scores_of_three_or_more"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "MET-rule-status",
+  "quote": "Rule status",
+  "status": "met",
+  "tests": [
+   "test_metrics.py::test_rule_status_counts_include_zeroes"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "PRIV-1",
+  "quote": "Nothing is sent to AI without per-item approval at the time of each review. Approval is not remembered for later reviews.",
+  "status": "met",
+  "tests": [
+   "test_review.py::test_only_approved_items_are_sent_and_the_payload_is_logged",
+   "test_review_findings_3.py::test_a_tag_typed_into_requirements_does_not_open_unapproved_history"
+  ],
+  "e2e": [
+   "an item that was not approved never left the server"
+  ]
+ },
+ {
+  "id": "PRIV-2",
+  "quote": "Items marked sensitive are never sent.",
+  "status": "met",
+  "tests": [
+   "test_review.py::test_unknown_or_sensitive_items_cannot_be_approved",
+   "test_requirements_extra.py::test_the_gate_itself_never_offers_or_sends_sensitive_items"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "PRIV-3",
+  "quote": "Internal links are never fetched. Only their title, URL, and note can be sent, with approval.",
+  "status": "met",
+  "tests": [
+   "test_links.py::test_internal_links_are_never_fetched",
+   "test_batching.py::test_a_link_note_can_be_cited_now_that_its_tag_is_in_the_material"
+  ],
+  "e2e": [
+   "internal link saved as a reference without fetching"
+  ]
+ },
+ {
+  "id": "PRIV-4",
+  "quote": "The API key is read from an environment variable and never stored in the database.",
+  "status": "met",
+  "tests": [
+   "test_requirements_extra.py::test_no_table_can_store_an_api_key",
+   "test_ollama.py::test_provider_choice"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "PRIV-5",
+  "quote": "With no Anthropic key, review material goes only to the Ollama server I configure.",
+  "status": "met",
+  "tests": [
+   "test_ollama.py::test_a_review_runs_through_ollama_and_costs_nothing"
+  ],
+  "e2e": [
+   "nothing was sent to Anthropic",
+   "Ollama received the approved material with the output schema"
+  ]
+ },
+ {
+  "id": "PRIV-6",
+  "quote": "The dashboard needs a login, and every form is protected against cross-site requests.",
+  "status": "met",
+  "tests": [
+   "test_auth.py::test_dashboard_redirects_to_login_without_session",
+   "test_auth.py::test_page_forms_require_session_csrf",
+   "test_auth.py::test_login_form_rejects_mismatched_csrf",
+   "test_auth.py::test_cookie_requests_need_csrf_header_for_writes"
+  ],
+  "e2e": [
+   "a bearer token cannot open the dashboard"
+  ]
+ },
+ {
+  "id": "PRIV-7",
+  "quote": "Each user's data is visible only to that user.",
+  "status": "met",
+  "tests": [
+   "test_capture.py::test_other_users_cannot_see_or_touch_my_data",
+   "test_links.py::test_other_users_cannot_read_my_snapshots",
+   "test_practice.py::test_other_users_cannot_review_my_drills"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "PRIV-8",
+  "quote": "Link capture fetches only public addresses.",
+  "status": "met",
+  "tests": [
+   "test_links.py::test_private_addresses_are_refused_even_through_a_redirect",
+   "test_review_findings_2.py::test_capture_connects_to_the_address_it_checked",
+   "test_review_findings_2.py::test_shared_address_space_is_not_public"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "PRIV-9",
+  "quote": "Captures and snapshots can be deleted at any time. Deleting a project deletes its snapshots.",
+  "status": "met",
+  "tests": [
+   "test_links.py::test_snapshots_can_be_edited_and_deleted",
+   "test_links.py::test_deleting_a_project_deletes_its_snapshots"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "NFR-1",
+  "quote": "Logging a failure takes under one minute.",
+  "status": "met",
+  "tests": [
+   "test_review_findings.py::test_queue_keeps_entries_on_server_errors_and_drops_only_rejections"
+  ],
+  "e2e": [
+   "one-line failure logging works with no prompts",
+   "failure is queued when the server is down"
+  ],
+  "note": "One command with only a title. Every other field can be skipped or filled in later."
+ },
+ {
+  "id": "NFR-2",
+  "quote": "One hosted service serves the dashboard and the CLI on any of my machines.",
+  "status": "met",
+  "tests": [
+   "test_auth.py::test_device_flow_issues_a_token_only_after_dashboard_approval",
+   "test_auth.py::test_revoking_a_device_kills_its_token_but_not_the_web_session"
+  ],
+  "e2e": [
+   "CLI receives its device token",
+   "password fallback signs in a second device with a hidden prompt",
+   "two devices are listed",
+   "dashboard lists projects"
+  ],
+  "note": "Not yet deployed. See DES-deploy."
+ },
+ {
+  "id": "NFR-3",
+  "quote": "The review finishes in reasonable time on long requirements (chunked reading).",
+  "status": "met",
+  "tests": [
+   "test_batching.py::test_long_documents_split_on_lines_and_every_call_keeps_the_context",
+   "test_batching.py::test_a_long_review_runs_in_several_calls_and_merges_the_results",
+   "test_review_findings_3.py::test_retrying_a_failed_multi_call_review_does_not_pay_for_finished_calls_again"
+  ],
+  "e2e": [],
+  "note": "evals/results: about 13 to 16 seconds per review with gemma4:12b on local Ollama."
+ },
+ {
+  "id": "NFR-4",
+  "quote": "Clear error messages: AI not available, link unreachable, login required, capture failed.",
+  "status": "met",
+  "tests": [
+   "test_requirements_extra.py::test_a_missing_ai_key_gives_a_clear_message",
+   "test_ollama.py::test_review_items_say_when_ollama_is_down",
+   "test_requirements_extra.py::test_an_unreachable_link_gives_a_clear_message",
+   "test_links.py::test_pages_behind_a_login_are_skipped_and_kept_as_references",
+   "test_links.py::test_javascript_pages_point_to_the_browser_extra"
+  ],
+  "e2e": [
+   "a login redirect is detected and skipped"
+  ]
+ },
+ {
+  "id": "NFR-5",
+  "quote": "Export is always available so data is never locked in.",
+  "status": "met",
+  "tests": [
+   "test_progress.py::test_export_contains_my_data_and_no_auth_secrets"
+  ],
+  "e2e": [
+   "JSON export has every data table and no auth tables"
+  ]
+ },
+ {
+  "id": "NFR-6",
+  "quote": "Monthly AI spend stays within a configured budget.",
+  "status": "met",
+  "tests": [
+   "test_review.py::test_monthly_budget_counts_each_call_at_its_worst_case",
+   "test_review_findings_2.py::test_concurrent_calls_cannot_overspend_the_budget"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "SUCCESS",
+  "requirement": "Section 17 success measures (repeat rate falls, fewer failures, guess accuracy rises, logging for four weeks).",
+  "status": "open",
+  "reason": "These are outcomes of real use. The metrics behind them are computed and tested (MET-*); the outcomes need weeks of the operator's own data."
+ },
+ {
+  "id": "DES-auth-web",
+  "requirement": "design 6.1: Argon2 password, HttpOnly Secure SameSite session cookie, idle expiry, logout, lockout, CSRF, HTTPS, optional TOTP.",
+  "status": "met",
+  "tests": [
+   "test_auth.py::test_password_hash_is_argon2",
+   "test_auth.py::test_login_sets_httponly_lax_session_cookie",
+   "test_auth.py::test_session_expires_after_inactivity",
+   "test_auth.py::test_logout_ends_the_session",
+   "test_review_findings.py::test_an_attacker_cannot_lock_the_owner_out_from_another_address",
+   "test_auth.py::test_cookie_requests_need_csrf_header_for_writes",
+   "test_auth.py::test_https_is_enforced_when_configured",
+   "test_auth.py::test_totp_is_required_once_enabled",
+   "test_review_findings.py::test_totp_codes_cannot_be_replayed"
+  ],
+  "e2e": [
+   "dashboard lists projects"
+  ]
+ },
+ {
+  "id": "DES-auth-cli",
+  "requirement": "design 6.2-6.4: device flow login, per-device revocable tokens in the keyring or a 0600 file, hidden password fallback, CLI tokens cannot open the dashboard.",
+  "status": "met",
+  "tests": [
+   "test_auth.py::test_device_flow_issues_a_token_only_after_dashboard_approval",
+   "test_auth.py::test_access_token_expires_and_refresh_rotates",
+   "test_auth.py::test_revoking_a_device_kills_its_token_but_not_the_web_session",
+   "test_auth.py::test_bearer_token_cannot_open_dashboard",
+   "test_auth.py::test_password_is_not_an_api_token",
+   "test_review_findings.py::test_token_file_is_tightened_even_if_it_already_existed"
+  ],
+  "e2e": [
+   "CLI receives its device token",
+   "token file is readable only by the owner",
+   "the password is never stored by the CLI",
+   "password fallback signs in a second device with a hidden prompt",
+   "a revoked device is locked out",
+   "a bearer token cannot open the dashboard"
+  ]
+ },
+ {
+  "id": "DES-ai-gate",
+  "requirement": "design 7: one gate module, payload and reply logged with prompt version, JSON validated and retried once, budget, stronger model for reviews, smaller for the rest, works without a key.",
+  "status": "met",
+  "tests": [
+   "test_review.py::test_only_the_client_module_imports_the_sdk_and_only_the_gate_calls_it",
+   "test_review.py::test_invalid_json_is_retried_once_then_reported",
+   "test_review.py::test_monthly_budget_counts_each_call_at_its_worst_case",
+   "test_review_findings_2.py::test_concurrent_calls_cannot_overspend_the_budget",
+   "test_review_findings_2.py::test_every_call_is_logged_even_when_the_client_crashes",
+   "test_review.py::test_anthropic_client_sends_schema_cache_and_fallbacks",
+   "test_review.py::test_failure_classification_is_only_sent_when_approved"
+  ],
+  "e2e": [
+   "review uses Opus 5.5 with refusal fallbacks",
+   "failure history is the cached prefix",
+   "classification uses the cheaper model"
+  ]
+ },
+ {
+  "id": "DES-ai-local",
+  "requirement": "Operator request: without an Anthropic key, AI calls go to local Ollama.",
+  "status": "met",
+  "tests": [
+   "test_ollama.py::test_provider_choice",
+   "test_ollama.py::test_a_review_runs_through_ollama_and_costs_nothing",
+   "test_ollama.py::test_request_carries_the_schema_and_context_and_reply_is_parsed",
+   "test_review_findings_3.py::test_ollama_refuses_input_longer_than_its_context_instead_of_truncating"
+  ],
+  "e2e": [
+   "with no Anthropic key the review goes to local Ollama",
+   "nothing was sent to Anthropic",
+   "Ollama received the approved material with the output schema"
+  ]
+ },
+ {
+  "id": "DES-capture-safety",
+  "requirement": "design 8 and 13: public capture only, private addresses refused, size and time limits.",
+  "status": "met",
+  "tests": [
+   "test_links.py::test_private_addresses_are_refused_even_through_a_redirect",
+   "test_review_findings_2.py::test_capture_connects_to_the_address_it_checked",
+   "test_review_findings_2.py::test_a_rebinding_answer_is_refused_before_connecting",
+   "test_review_findings_2.py::test_capture_stops_reading_at_the_size_cap",
+   "test_review_findings_2.py::test_capture_has_a_total_deadline",
+   "test_links.py::test_large_snapshots_are_capped_and_flagged"
+  ],
+  "e2e": []
+ },
+ {
+  "id": "DES-data",
+  "requirement": "design 9: Postgres and SQLite via SQLAlchemy, Alembic from day one, UUID keys, user_id on every table, full-text search.",
+  "status": "met",
+  "tests": [
+   "test_capture.py::test_search_matches_any_text_field_and_filters_by_project",
+   "test_capture.py::test_other_users_cannot_see_or_touch_my_data",
+   "test_metrics.py::test_stored_times_come_back_in_utc_so_day_arithmetic_ignores_dst"
+  ],
+  "e2e": [
+   "alembic migration created the schema"
+  ],
+  "note": "check.sh runs the migration round trip; the suites also run on Postgres via PREFLIGHT_TEST_DATABASE_URL and PREFLIGHT_E2E_DATABASE_URL."
+ },
+ {
+  "id": "DES-offline",
+  "requirement": "design 14: failures and wins queue offline and replay without duplicates; cold-start retry message.",
+  "status": "met",
+  "tests": [
+   "test_capture.py::test_replaying_a_failure_id_does_not_duplicate",
+   "test_review_findings.py::test_queue_keeps_entries_on_server_errors_and_drops_only_rejections"
+  ],
+  "e2e": [
+   "failure is queued when the server is down",
+   "queue flushes on the next command",
+   "replaying the same queue again does not duplicate"
+  ]
+ },
+ {
+  "id": "DES-testing",
+  "requirement": "design 15: fake AI client, golden prompt tests, an evaluation set, metric unit tests, auth tests, gate tests.",
+  "status": "met",
+  "tests": [
+   "test_golden.py::test_review_payload_matches_the_golden_file",
+   "test_review.py::test_drafts_must_cite_material_that_was_actually_sent"
+  ],
+  "e2e": [],
+  "note": "scripts/eval_review.py with evals/review_cases.json; results in evals/results."
+ },
+ {
+  "id": "DES-backfill",
+  "requirement": "design 18: backfill command to import old failures with past dates.",
+  "status": "met",
+  "tests": [
+   "test_import.py::test_csv_rows_are_parsed_and_bad_rows_reported_with_their_line",
+   "test_import.py::test_replaying_imported_rows_adds_nothing",
+   "test_review_findings_3.py::test_one_bad_json_row_does_not_abort_the_import"
+  ],
+  "e2e": [
+   "a CSV backfill imports good rows",
+   "importing the same file twice adds nothing",
+   "backfilled failures keep their original dates"
+  ]
+ },
+ {
+  "id": "DES-deploy",
+  "requirement": "design 12 and 17: deploy to Render Starter and Neon.",
+  "status": "open",
+  "reason": "Needs the operator's Render and Neon accounts, and deploys always wait for the operator. README documents the proxy flags."
+ },
+ {
+  "id": "DES-backups",
+  "requirement": "design 13: provider restore or a nightly dump, with one tested restore.",
+  "status": "open",
+  "reason": "Depends on the chosen host (open decision 5 in docs/design.md)."
+ },
+ {
+  "id": "DES-live-claude",
+  "requirement": "A real call to the Claude API.",
+  "status": "open",
+  "reason": "No API key was available. The request format is verified against a local fake of the Messages API, and the Ollama path against a real local model."
+ }
 ]

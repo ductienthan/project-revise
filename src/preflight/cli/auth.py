@@ -79,6 +79,7 @@ def auth() -> None:
 
 @auth.command("devices")
 def devices() -> None:
+    """List the devices signed in to your account."""
     table = Table("id", "name", "created", "last used", "revoked")
     for d in Client().get("/auth/devices"):
         table.add_row(d["id"], d["name"], d["created_at"][:16], (d["last_used_at"] or "")[:16], (d["revoked_at"] or "")[:16])
@@ -88,5 +89,6 @@ def devices() -> None:
 @auth.command("revoke")
 @click.argument("device_id")
 def revoke(device_id: str) -> None:
+    """Sign a device out. Its token stops working at once."""
     Client().delete(f"/auth/devices/{device_id}")
     click.echo("Revoked.")

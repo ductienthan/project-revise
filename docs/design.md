@@ -1,8 +1,8 @@
 # Preflight: Design and Technology
 
-Version 0.1 | Draft | 2026-10-17
+Version 0.2 | 2026-10-18
 
-Companion to `preflight-requirements.md`. That document says what Preflight does. This one says how it is built, what it runs on, and what it costs.
+Companion to [the requirements](requirements.md). That document says what Preflight does. This one says how it is built, what it runs on, and what it costs. The [CLI](cli.md), [configuration](configuration.md), [API](api.md), and [data model](data-model.md) references are generated from the code by `scripts/gen_docs.py`.
 
 ---
 
@@ -17,7 +17,7 @@ Companion to `preflight-requirements.md`. That document says what Preflight does
 | Database        | Postgres (Neon Free to start). SQLite for local development and tests                  |
 | Dashboard login | Username and password, hashed, session cookie, optional TOTP                           |
 | CLI login       | `preflight login` using browser sign-in (device flow). Per-device token                |
-| AI              | Claude API, called from the server only, always behind an approval gate                |
+| AI              | Claude API, or a local Ollama model when no key is set. Server only, always gated      |
 | Link capture    | Public links only: httpx + trafilatura, Playwright as a fallback                       |
 | Scheduling      | Computed on demand when a command runs. No background daemon                           |
 | Hosting         | Render Starter web service + Neon Free Postgres                                        |
@@ -49,6 +49,7 @@ flowchart LR
     end
     CORE --> DB[(Postgres on Neon)]
     GATE -->|approved items only| CLAUDE[Claude API]
+    GATE -.->|no Anthropic key| OLLAMA[Local Ollama]
     CORE -->|public links only| WEB[Public web pages]
 ```
 
@@ -56,7 +57,7 @@ Rules:
 
 - Route handlers are thin. Logic lives in the core service modules so the CLI, UI, and tests all share it.
 - The database is never exposed to the CLI. Only the API talks to it.
-- All AI calls go through one gate module. No other module imports the Claude SDK.
+- All AI calls go through one gate module. Only `ai/client.py` imports the Claude SDK, and a test enforces it.
 
 ## 4. Components
 
@@ -175,8 +176,13 @@ sequenceDiagram
 - Model use:
   - Stronger model for the project review.
   - Smaller, cheaper model for failure classification and drill grading.
-- Cost controls: monthly spend limit in the Anthropic Console, output token caps, relevant-failures-only context, prompt caching for the repeated history prefix, batch API (50% cheaper) for weekly reports and bulk jobs.
-- Without an API key the app still logs failures, builds rule-based checklists, and shows the dashboard.
+- Cost controls: monthly spend limit in the Anthropic Console, output token caps, relevant-failures-only context, and prompt caching for the repeated history prefix. Each call reserves its worst-case cost before it is sent, and a call that would pass `PREFLIGHT_AI_MONTHLY_BUDGET_USD` is refused. The weekly report uses no AI.
+- Providers sit behind one interface in `ai/client.py`. Each provider owns its models, prices, context size, and availability.
+  - With `PREFLIGHT_ANTHROPIC_API_KEY`, reviews use Claude Opus 5.5 and the smaller tasks use Claude Haiku 5.5, with server-side refusal fallbacks on Opus.
+  - Without a key, `ai/ollama.py` calls a local Ollama server with the same JSON schema. It asks Ollama to refuse input longer than the context instead of truncating it.
+- Material longer than the model's context is split on line boundaries into several calls. The history and notes ride in every call. A draft may cite only what its own call received: failure and rule tags when history was sent, numbered requirement lines in that part, and the link and snapshot items themselves.
+- If a later call in a review fails, a retry reuses the earlier calls' logged replies instead of paying for them again. A deliberate re-review always asks fresh.
+- Without any provider the app still logs failures, builds rule-based checklists, and shows the dashboard.
 
 ## 8. Public link capture
 
@@ -188,11 +194,12 @@ sequenceDiagram
 - Pages that require a login are detected and skipped with a clear message.
 - Snapshots store URL, title, headings, text, tables, and capture time, and are versioned. Refresh creates a new version.
 - You preview every snapshot before it can be used.
-- Playwright is an optional install, since it is large. Hosted capture can run on a small separate job if the web service is too small for a browser.
+- Every request connects to an address that was checked as public, on every redirect. A second DNS answer cannot point capture at the server's own network. Responses stop at 5 MB and 30 seconds.
+- Playwright is an optional install, since it is large, and the browser is off unless `PREFLIGHT_CAPTURE_BROWSER` is set. When on, every browser request passes the same address check. Hosted capture can run on a small separate job if the web service is too small for a browser.
 
 ## 9. Data
 
-Tables are defined in `preflight-requirements.md` section 13. Design notes:
+[The data model reference](data-model.md) lists every table and column. Design notes:
 
 - Postgres on the host, SQLite for local development and tests, through SQLAlchemy.
 - Migrations with Alembic from day one.
@@ -205,7 +212,7 @@ Tables are defined in `preflight-requirements.md` section 13. Design notes:
 
 ## 10. API outline
 
-Base path `/api/v1`. All endpoints require a session cookie or a bearer token.
+Base path `/api/v1`. All endpoints require a session cookie or a bearer token. [The API reference](api.md) lists every endpoint. The outline below groups the main ones.
 
 | Area               | Endpoints                                                                                                                                      |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -219,7 +226,7 @@ Base path `/api/v1`. All endpoints require a session cookie or a bearer token.
 | Wins               | `POST /projects/{id}/wins`                                                                                                                     |
 | Patterns and rules | `GET /patterns`, `GET /rules`, `POST /rules`, `PATCH /rules/{id}`                                                                              |
 | Drills             | `GET /drills/today`, `POST /drills/{id}/review`                                                                                                |
-| Predictions        | `POST /predictions`, `POST /predictions/{id}/close`                                                                                            |
+| Predictions        | `POST /projects/{id}/predictions`, `GET /projects/{id}/predictions`, `POST /predictions/{id}/close`                                            |
 | Reports            | `GET /progress`, `GET /reports/weekly`, `GET /projects/{id}/status`                                                                            |
 | Export             | `GET /export?format=csv\|json\|md`                                                                                                             |
 
@@ -228,7 +235,7 @@ Base path `/api/v1`. All endpoints require a session cookie or a bearer token.
 | Area               | Choice                                                   | Pros                                                                    | Cons                                                                      | Alternative                                         |
 | ------------------ | -------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------- |
 | Language           | Python 3.12+                                             | Your core stack, best AI SDK support, SQLite and CLI libraries          | Slower CLI startup than a compiled binary                                 | TypeScript, Go                                      |
-| CLI                | Click (custom project-first group), Rich, questionary    | Full control of `preflight <project> <action>`, good prompts and tables | Small amount of custom routing, project names cannot equal reserved words | Typer, argparse                                     |
+| CLI                | Click (custom project-first group), Rich                 | Full control of `preflight <project> <action>`, good prompts and tables | Small amount of custom routing, project names cannot equal reserved words | Typer, argparse                                     |
 | API                | FastAPI + Pydantic                                       | Your stack, typed, shares models with the AI output validation          | None significant                                                          | Flask                                               |
 | UI                 | Jinja + HTMX + Chart.js                                  | No build step, Python only, enough for forms, tables, charts            | Less polished than a SPA                                                  | React or Vite SPA                                   |
 | Database           | Postgres (Neon)                                          | Hosted, familiar, FTS and pgvector available later                      | Free tier has limits and a short cold start                               | SQLite, Render Postgres                             |
@@ -267,12 +274,13 @@ Prices were found through web searches in October 2026 and move often. Confirm o
 
 Avoid: Fly.io managed Postgres (from $38/month), Render Standard instances ($25/month), separate paid Redis.
 
-### 12.3 Claude API cost estimate
+### 12.3 AI cost estimate
 
-- Sonnet-class pricing has been $3 per million input tokens and $15 per million output tokens. Check the current page for the newest model.
-- Project review: about 25k input and 3k output tokens, roughly $0.12 (up to about $0.25 with long snapshots).
-- Failure classification: about $0.01. Drill grading: about $0.005.
-- A busy month (4 project reviews, 60 failures, 150 drills): about $2-5.
+- Claude Opus 5.5, used for reviews, costs $4 per million input tokens and $20 per million output tokens. Claude Haiku 5.5, used for the smaller tasks, costs $0.10 and $0.50. Check the current pricing page before relying on these.
+- Project review: about 25k input and 3k output tokens, roughly $0.16 (more with long snapshots).
+- Failure classification and drill grading: well under $0.01 each.
+- A busy month (4 project reviews, 60 failures, 150 drills): about $1-3.
+- A local Ollama model costs nothing per call.
 
 ### 12.4 Splitting the UI from the API
 
@@ -302,53 +310,59 @@ Avoid: Fly.io managed Postgres (from $38/month), Render Standard instances ($25/
 
 ## 15. Testing
 
-- `pytest` with a fake AI client so tests are fast and free.
-- Golden tests for prompts: sample projects and failure histories with expected checklist items.
-- A small evaluation set to compare review quality when prompts or models change.
+- `pytest` with a fake AI client so tests are fast and free. `tests/fakes.py` also has local fakes of the Anthropic Messages API and of Ollama, so the real clients are tested over HTTP.
+- A golden test (`tests/golden/review_payload.txt`) pins the exact review payload, so a prompt change shows up as a diff.
+- An evaluation set (`evals/review_cases.json`, run by `scripts/eval_review.py`) scores review quality against the configured provider. Results are in `evals/results/`.
 - Unit tests for every dashboard metric, since the dashboard's credibility depends on them.
 - Auth tests: login, lockout, device flow, token revoke, CSRF.
 - Gate tests: nothing is sent without approval, and sensitive items are never offered.
+- `scripts/e2e.py` drives the real migration, server, CLI binary, and dashboard forms.
+- `scripts/validate_requirements.py` checks every requirement against passing tests and end-to-end checks, and `scripts/mutation_check.py` breaks key protections on purpose to prove the tests catch them. `scripts/check.sh` runs all of it.
 
 ## 16. Repository layout
 
-```
-preflight/
+```text
+project-revise/
   pyproject.toml
   src/preflight/
-    cli/              # Click commands, API client, offline queue
+    cli/              # Click commands, API client, offline queue, importer
     server/
-      main.py         # FastAPI app
+      main.py         # FastAPI app factory; asgi.py builds the app for uvicorn
       api/v1/         # routers
-      ui/             # templates, static files
-      auth/           # hashing, sessions, device flow, TOTP
-    core/             # projects, checklist, patterns, rules, metrics, drills
-    ai/               # gate, prompts (versioned), schemas, client
-    capture/          # fetch, extract, snapshots
+      ui/             # pages, templates, static files
+      auth/           # hashing, sessions, device flow, TOTP, lockout, rate limit
+    core/             # projects, checklist, lifecycle, review, patterns, metrics, drills, export
+    ai/               # gate, providers (Anthropic, Ollama), versioned prompts, schemas
+    capture/          # fetch, extract, browser fallback
     db/               # models, migrations
-  tests/
-  docs/
-    preflight-requirements.md
-    preflight-design.md
+  tests/              # pytest suite, fakes, golden payload
+  scripts/            # check.sh, e2e, validation, mutation check, eval, doc generator
+  evals/              # review evaluation cases and results
+  validation/         # requirements matrix and generated report
+  docs/               # requirements, design, and generated references
+  .audit/             # decision log of the build
 ```
 
 ## 17. Build phases
 
-| Phase             | Scope                                                                                                     | Result                                       |
-| ----------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| **1. Foundation** | Repo, models, migrations, API skeleton, dashboard login, CLI login (device flow), deploy to Render + Neon | You can sign in from the website and the CLI |
-| **2. Capture**    | Projects, requirements, failure and win logging, search, offline queue                                    | Failures stored per project                  |
-| **3. Checklist**  | Pattern detection, rules, rule-based checklist, start gate, failure-to-item linking                       | Checklist before each project                |
-| **4. AI review**  | Approval gate, questions, gap list, requirement-aware checklist, cost estimate                            | Questions based on history                   |
-| **5. Links**      | Saved links, public capture, snapshots                                                                    | Public references available to review        |
-| **6. Progress**   | Retrospective, dashboard metrics, rule verdicts, weekly report                                            | Evidence of improvement                      |
-| **7. Thinking**   | Drills, spaced repetition, predictions, calibration                                                       | Logical-thinking practice                    |
+| Phase             | Scope                                                                                                     | Result                                       | Status |
+| ----------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ------ |
+| **1. Foundation** | Repo, models, migrations, API skeleton, dashboard login, CLI login (device flow), deploy to Render + Neon | You can sign in from the website and the CLI | Built. Deploy not done. |
+| **2. Capture**    | Projects, requirements, failure and win logging, search, offline queue                                    | Failures stored per project                  | Built |
+| **3. Checklist**  | Pattern detection, rules, rule-based checklist, start gate, failure-to-item linking                       | Checklist before each project                | Built |
+| **4. AI review**  | Approval gate, questions, gap list, requirement-aware checklist, cost estimate                            | Questions based on history                   | Built, with Ollama fallback |
+| **5. Links**      | Saved links, public capture, snapshots                                                                    | Public references available to review        | Built |
+| **6. Progress**   | Retrospective, dashboard metrics, rule verdicts, weekly report                                            | Evidence of improvement                      | Built |
+| **7. Thinking**   | Drills, spaced repetition, predictions, calibration                                                       | Logical-thinking practice                    | Built |
+
+[The validation report](../validation/report.md) lists the evidence for each requirement.
 
 ## 18. Risks
 
 | Risk                                       | Handling                                                                                  |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------- |
 | Logging feels like a chore and I stop      | One-line `fail` command, remaining fields as prompts, optional AI pre-fill, offline queue |
-| Dashboard is empty at first                | Backfill command to import old failures with past dates                                   |
+| Dashboard is empty at first                | `preflight import` backfills old failures with their past dates                           |
 | AI invents checklist items                 | Required source reference, drop items without one, you approve before saving              |
 | Private requirements sent to AI by mistake | Per-item approval, sensitive flag, payload audit log                                      |
 | Free tiers change or disappear             | Standard Postgres and a plain container, so moving hosts is a config change               |
@@ -359,9 +373,9 @@ preflight/
 
 ## 19. Open decisions
 
-1. Confirm hosting: Render Starter + Neon Free (recommended), or a Hetzner VPS.
-2. Add TOTP at launch, or later.
-3. Protect the whole site behind an access proxy (Cloudflare Access or Tailscale), or rely on the login alone.
-4. Use a stronger model only for project reviews and a cheaper one elsewhere (recommended), or one model for everything.
-5. Backups: rely on provider restore, or add a nightly dump.
-6. Gate strictness and other product decisions are listed in `preflight-requirements.md` section 20.
+1. Confirm hosting: Render Starter + Neon Free (recommended), or a Hetzner VPS. Open.
+2. Add TOTP at launch, or later. Decided: available at launch, enabled with `preflight-server enable-totp`.
+3. Protect the whole site behind an access proxy (Cloudflare Access or Tailscale), or rely on the login alone. Open.
+4. Use a stronger model only for project reviews and a cheaper one elsewhere, or one model for everything. Decided: Opus 5.5 for reviews and Haiku 5.5 elsewhere, with local Ollama when there is no key.
+5. Backups: rely on provider restore, or add a nightly dump. Open.
+6. Gate strictness and other product decisions are recorded in [the requirements' decisions](requirements.md#decisions).

@@ -116,6 +116,7 @@ def _by_prefix(rows: list[dict], prefix: str, what: str) -> dict:
 @click.option("--text", help="Checklist text. Defaults to the suggested rule.")
 @click.option("--ai", "use_ai", is_flag=True, help="Ask AI to draft the rule from this pattern's failures.")
 def approve(pattern_id: str, text: str | None, use_ai: bool) -> None:
+    """Turn a repeated pattern into an active rule. PATTERN_ID can be the first characters of the id."""
     client = Client()
     suggestion = _by_prefix([s["pattern"] | {"suggested_rule": s["suggested_rule"]} for s in client.get("/patterns")], pattern_id, "pattern")
     draft = suggestion["suggested_rule"]
@@ -131,6 +132,7 @@ def approve(pattern_id: str, text: str | None, use_ai: bool) -> None:
 @click.option("--status", type=click.Choice(["active", "working", "needs revision", "retired"]))
 @click.option("--text")
 def set_rule(rule_id: str, status: str | None, text: str | None) -> None:
+    """Change a rule's text or status, for example to retire it."""
     client = Client()
     rule = _by_prefix(client.get("/rules"), rule_id, "rule")
     client.patch(f"/rules/{rule['id']}", json={"status": status, "checklist_text": text})

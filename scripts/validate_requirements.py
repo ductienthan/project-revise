@@ -28,14 +28,22 @@ STATUSES = {"met", "open", "superseded"}
 WORST_FIRST = ["passed", "skipped", "failed"]
 
 
+def section(text: str, heading: str) -> str:
+    """The body under a heading, up to the next heading of the same or a higher level."""
+    level = heading.split(" ", 1)[0]
+    match = re.search(rf"^{re.escape(heading)}\n(.*?)(?=^#{{1,{len(level)}}} |\Z)", text, re.MULTILINE | re.DOTALL)
+    if match is None:
+        raise SystemExit(f"docs/requirements.md has no heading '{heading}'")
+    return match.group(1)
+
+
 def doc_items(text: str) -> dict[str, str]:
-    """Every requirement the document states, keyed the way matrix entries refer to them."""
-    items = {f"FR:{m}": m for m in re.findall(r"\*\*(FR-\d+)\*\*", text)}
-    metrics = text.split("### 12.1", 1)[1].split("### 12.2", 1)[0]
-    items |= {f"Q:{m}": m for m in re.findall(r"^\| \*\*(.+?)\*\* +\|", metrics, re.MULTILINE)}
-    for heading in ("## 15.", "## 16."):
-        section = text.split(heading, 1)[1].split("\n## ", 1)[0]
-        items |= {f"Q:{b}": b for b in re.findall(r"^- (.+)$", section, re.MULTILINE)}
+    """Every requirement the document states, keyed the way matrix entries refer to them, with its wording."""
+    items = {f"FR:{fr}": wording for fr, wording in re.findall(r"^- \*\*(FR-\d+)\*\* (.+)$", text, re.MULTILINE)}
+    metrics = section(text, "### Metric definitions")
+    items |= {f"Q:{m}": m for m in re.findall(r"^\| \*\*(.+?)\*\* \|", metrics, re.MULTILINE)}
+    for heading in ("## Privacy and security", "## Non-functional requirements"):
+        items |= {f"Q:{b}": b for b in re.findall(r"^- (.+)$", section(text, heading), re.MULTILINE)}
     return items
 
 
@@ -75,7 +83,8 @@ def main() -> int:
     problems += [f"{i}: listed more than once" for i in duplicates]
     covered = {f"FR:{e['id']}" for e in entries if e["id"].startswith("FR-")} | {f"Q:{e['quote']}" for e in entries if "quote" in e}
     stated = doc_items((ROOT / "docs" / "requirements.md").read_text())
-    problems += [f"{text}: in docs/requirements.md but not in the matrix" for key, text in stated.items() if key not in covered]
+    problems += [f"{key.split(':', 1)[1] if key.startswith('FR:') else text}: in docs/requirements.md but not in the matrix"
+                 for key, text in stated.items() if key not in covered]
     problems += [f"{key[2:]}: in the matrix but not in docs/requirements.md" for key in covered if key not in stated]
 
     print("Running the test suite and the end-to-end check...", flush=True)
@@ -107,7 +116,7 @@ def main() -> int:
             if not e.get("reason"):
                 problems.append(f"{e['id']}: {status} needs a reason")
             detail = e.get("reason", "")
-        text = e.get("requirement") or e.get("quote", "")
+        text = stated.get(f"FR:{e['id']}") or e.get("requirement") or e.get("quote", "")
         rows.append((e["id"], verdict, text, detail + (f" {e['note']}" if e.get("note") else "")))
 
     counts = Counter(v for _, v, *_ in rows)
