@@ -22,9 +22,10 @@ class ReviewItemOut(BaseModel):
 
 class ReviewItemsOut(BaseModel):
     ai_available: bool
+    provider: str | None
     items: list[ReviewItemOut]
     excluded_sensitive: int
-    model: str
+    model: str | None
     max_cost_usd: float
     last_review_version: int | None
     requirements_version: int | None
@@ -90,15 +91,17 @@ def review_out(db, r: Review, dropped: int = 0) -> ReviewOut:
 def review_items(request: Request, project: ProjectRef, db: Db, settings: AppSettings) -> ReviewItemsOut:
     found = review.material(db, project)
     offered = gate.offerable(found.items)
-    estimate = gate.estimate(settings, REVIEW, offered)
+    ai = _ai(request)
+    estimate = gate.estimate(ai, REVIEW, offered) if ai is not None and ai.available() else None
     last = review.latest_review(db, project, completed=True)
     current = review.latest_requirements(project)
     return ReviewItemsOut(
-        ai_available=_ai(request) is not None,
+        ai_available=estimate is not None,
+        provider=ai.provider if ai is not None else None,
         items=[ReviewItemOut(id=i.id, kind=i.kind, label=i.label, tokens=i.tokens) for i in offered],
         excluded_sensitive=found.excluded_sensitive,
-        model=estimate.model,
-        max_cost_usd=estimate.max_cost_usd,
+        model=estimate.model if estimate else None,
+        max_cost_usd=estimate.max_cost_usd if estimate else 0.0,
         last_review_version=last.requirements_version if last else None,
         requirements_version=current.version if current else None,
     )

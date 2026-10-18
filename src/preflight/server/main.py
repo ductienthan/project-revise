@@ -7,8 +7,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from preflight.ai.client import AIClient, AnthropicClient
+from preflight.ai.client import AIClient
 from preflight.ai.gate import AIUnavailable
+from preflight.ai.providers import make_client
 from preflight.capture.fetch import Fetcher
 from preflight.config import Settings
 from preflight.core.errors import DomainError, NotFound
@@ -31,8 +32,8 @@ def create_app(
     settings: Settings | None = None, clock: Callable[[], datetime] = utcnow, ai: AIClient | None = None
 ) -> FastAPI:
     settings = settings or Settings()
-    if ai is None and settings.anthropic_api_key:
-        ai = AnthropicClient(settings.anthropic_api_key, settings.anthropic_base_url)
+    if ai is None:
+        ai = make_client(settings)
     app = FastAPI(title="Preflight", docs_url=None, redoc_url=None)
     app.state.settings = settings
     app.state.clock = clock

@@ -26,3 +26,16 @@
 - [ ] Deploy to Render + Neon. skip: needs the operator's accounts, and deploys always pause for the operator
 - [ ] Real Claude API call. skip: no API key provided; wire format verified against a fake server only
 - [ ] Playwright fallback. skip: not installed; off by default
+
+# Gaps and local Ollama (third turn)
+
+- [ ] U1 provider abstraction + Ollama fallback when no Anthropic key
+- [ ] U2 chunked review sized to the provider context (section 16)
+- [ ] U3 golden payload test + review eval set run on local Ollama (design 15)
+- [ ] U4 FR-13 show exact text before approval; FR-4 re-review on link changes and after start
+- [ ] U5 FR-35 rule matching; 9.2 linked failures on checklist items
+- [ ] U6 FR-39 calibration trend, minutes per week, wins by tag; FR-1 dashboard create project and edit requirements
+- [ ] U7 bulk failure import for backfill
+- [ ] U8 Playwright fallback installed and tested
+- [ ] Independent review of the diff
+- [ ] Final predicate: check.sh green on SQLite and Postgres

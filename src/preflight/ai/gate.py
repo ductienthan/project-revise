@@ -10,7 +10,7 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from preflight.ai.client import AIClient, AIError, cost_usd
+from preflight.ai.client import AIClient, AIError
 from preflight.ai.prompts import Prompt
 from preflight.ai.schemas import strict_schema
 from preflight.config import Settings
@@ -57,14 +57,10 @@ def build_payload(items: list[GateItem], approved_ids: set[str]) -> list[GateIte
     return [item for item in items if item.id in approved_ids]
 
 
-def model_for(settings: Settings, prompt: Prompt) -> str:
-    return settings.review_model if prompt.role == "review" else settings.small_model
-
-
-def estimate(settings: Settings, prompt: Prompt, items: list[GateItem]) -> Estimate:
-    model = model_for(settings, prompt)
+def estimate(ai: AIClient, prompt: Prompt, items: list[GateItem]) -> Estimate:
+    model = ai.model_for(prompt.role)
     tokens = sum(i.tokens for i in items) + len(prompt.system) // CHARS_PER_TOKEN
-    return Estimate(model, tokens, round(cost_usd(model, tokens, prompt.max_tokens), 4))
+    return Estimate(model, tokens, round(ai.price(model, tokens, prompt.max_tokens), 4))
 
 
 def spent_this_month(db: Session, user_id: uuid.UUID, at: datetime) -> float:
@@ -101,7 +97,10 @@ def run(
     payload = build_payload(items, approved_ids)
     if not payload:
         raise DomainError("Nothing was approved, so nothing was sent.")
-    call = _reserve(db, settings, user_id, prompt, payload, approved_ids, at)
+    try:
+        call = _reserve(db, ai, settings, user_id, prompt, payload, approved_ids, at)
+    except AIError as err:
+        raise AIUnavailable(str(err)) from None
     schema = strict_schema(prompt.output)
     content = json.loads(call.payload)["content"]
     call.cost_usd = 0.0
@@ -110,7 +109,7 @@ def run(
             completion = ai.complete(model=call.model, system=prompt.system, content=content, schema=schema, max_tokens=prompt.max_tokens)
             call.input_tokens += completion.input_tokens
             call.output_tokens += completion.output_tokens
-            call.cost_usd += cost_usd(
+            call.cost_usd += ai.price(
                 completion.model, completion.input_tokens, completion.output_tokens,
                 completion.cache_read_tokens, completion.cache_write_tokens,
             )
@@ -135,6 +134,7 @@ _reservation_lock = threading.Lock()
 
 def _reserve(
     db: Session,
+    ai: AIClient,
     settings: Settings,
     user_id: uuid.UUID,
     prompt: Prompt,
@@ -147,7 +147,7 @@ def _reserve(
     The row is committed first, so a crash mid-call still leaves the audit record, and concurrent calls see each
     other's reservations when checking the budget.
     """
-    worst = estimate(settings, prompt, payload)
+    worst = estimate(ai, prompt, payload)
     with _reservation_lock:
         db.execute(select(User.id).where(User.id == user_id).with_for_update())
         spent = spent_this_month(db, user_id, at)

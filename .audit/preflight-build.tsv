@@ -50,3 +50,7 @@ ts	phase	decision	why	evidence	result
 2026-10-18T00:11:17Z	review2	drill creation inserts each drill in a savepoint	two concurrent requests could hit the unique constraint (reviewer did not run it)	core/drills.py create_missing	not reproduced; guarded
 2026-10-18T00:11:17Z	review2	removed the unused secret_key and server api_url settings	nothing read them	config.py, .env.example	green
 2026-10-18T00:11:17Z	verify	final predicate	phase E	check.sh: 136 tests, 89/89 e2e on sqlite; same on postgres	VERIFIED
+2026-10-18T00:26:33Z	u1	each AI client owns its models, prices, context size and availability; the gate asks the client instead of settings	a second provider would otherwise spread provider checks through the gate and the API	ai/client.py AIClient protocol, ai/providers.py make_client	148 tests green
+2026-10-18T00:26:33Z	u1	with no Anthropic key, auto mode uses local Ollama; with no model configured it picks the largest installed model	operator asked for Ollama when the key is missing; this machine has gemma4:12b, gemma4:e4b, mistral	ai/ollama.py model_for	live call to gemma4:12b parsed against the schema
+2026-10-18T00:26:33Z	u1	unknown Anthropic model names now raise instead of being priced as Opus	a typo would have silently mispriced the budget check	ai/client.py anthropic_price	green
+2026-10-18T00:26:33Z	u1	live test asserts a parsed, non-empty reply, not the model's category choice	gemma4 chose a different category; judging quality belongs in the eval, not a unit test	tests/test_ollama.py live test	passes with PREFLIGHT_TEST_OLLAMA=1

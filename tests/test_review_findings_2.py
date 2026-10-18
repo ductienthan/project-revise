@@ -11,6 +11,7 @@ from preflight.db.models import AiCall
 from preflight.server.auth import service
 from preflight.server.main import create_app
 from tests.conftest import PASSWORD, token_client
+from tests.fakes import FakeAI
 from tests.test_links import ARTICLE
 
 
@@ -104,8 +105,9 @@ def test_the_browser_fallback_is_off_unless_enabled(app, api, monkeypatch):
     assert "PREFLIGHT_CAPTURE_BROWSER" in captured["capture_error"]
 
 
-class SlowAI:
+class SlowAI(FakeAI):
     def __init__(self):
+        super().__init__()
         self.release = threading.Event()
         self.calls = 0
 
@@ -142,7 +144,7 @@ def test_concurrent_calls_cannot_overspend_the_budget(tmp_path):
 
 
 def test_every_call_is_logged_even_when_the_client_crashes(app, api):
-    class Broken:
+    class Broken(FakeAI):
         def complete(self, **kwargs):
             raise RuntimeError("socket closed")
 

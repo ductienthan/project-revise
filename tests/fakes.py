@@ -3,15 +3,27 @@ import re
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from preflight.ai.client import Completion
+from preflight.ai.client import Completion, anthropic_price
 
 
 class FakeAI:
-    """In-process AI client. Replies come from `replies` in order, or from `reply_for` when the list runs out."""
+    """In-process AI client priced like Anthropic. Replies come from `replies` in order, or from `reply_for`."""
+
+    provider = "fake"
+    context_tokens = 200_000
 
     def __init__(self, *replies: str):
         self.replies = list(replies)
         self.calls: list[dict] = []
+
+    def model_for(self, role: str) -> str:
+        return {"review": "claude-opus-5-5", "small": "claude-haiku-5-5"}[role]
+
+    def price(self, model, input_tokens, output_tokens, cache_read=0, cache_write=0) -> float:
+        return anthropic_price(model, input_tokens, output_tokens, cache_read, cache_write)
+
+    def available(self) -> bool:
+        return True
 
     def complete(self, *, model, system, content, schema, max_tokens) -> Completion:
         self.calls.append({"model": model, "system": system, "content": content, "schema": schema})

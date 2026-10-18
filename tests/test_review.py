@@ -181,7 +181,7 @@ def fake_api():
 
 
 def test_anthropic_client_sends_schema_cache_and_fallbacks(fake_api):
-    client = AnthropicClient("sk-test", fake_api.url)
+    client = AnthropicClient("sk-test", fake_api.url, "claude-opus-5-5", "claude-haiku-5-5")
     schema = strict_schema(ReviewOutput)
     content = [{"type": "text", "text": "REQ:1 hello", "cache_control": {"type": "ephemeral"}}]
     completion = client.complete(model="claude-opus-5-5", system="sys", content=content, schema=schema, max_tokens=100)
@@ -201,6 +201,6 @@ def test_anthropic_client_sends_schema_cache_and_fallbacks(fake_api):
 def test_anthropic_client_reports_refusals(fake_api):
     fake_api.next_stop_reason = "refusal"
     with pytest.raises(AIError, match="declined"):
-        AnthropicClient("sk-test", fake_api.url).complete(
+        AnthropicClient("sk-test", fake_api.url, "claude-opus-5-5", "claude-haiku-5-5").complete(
             model="claude-opus-5-5", system="s", content=[{"type": "text", "text": "x"}], schema=strict_schema(ReviewOutput), max_tokens=10
         )
