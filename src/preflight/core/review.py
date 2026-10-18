@@ -1,3 +1,5 @@
+import hashlib
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -32,6 +34,7 @@ from preflight.db.models import (
 )
 
 MAX_HISTORY_FAILURES = 40
+MAX_QUESTIONS = 12
 
 
 @dataclass(frozen=True)
@@ -85,13 +88,15 @@ def material(db: Session, project: Project) -> ReviewMaterial:
             continue
         ref = f"L:{short_id(link.id)}"
         refs[ref] = None
-        note = f"Title: {link.title}\nURL: {link.url}\nNote: {link.note}"
+        note = f"{ref}\nTitle: {link.title}\nURL: {link.url}\nNote: {link.note}"
         items.append(GateItem(f"link:{link.id}", "link_note", f"Note on {link.type} link: {link.title or link.url}", note))
         approved = [s for s in link.snapshots if s.approved]
         if link.type == LinkType.PUBLIC and approved:
             snap = approved[-1]
-            refs[f"S:{short_id(snap.id)}"] = None
-            items.append(GateItem(f"snapshot:{snap.id}", "snapshot", f"Snapshot: {link.title or link.url} v{snap.version} ({len(snap.content.split())} words)", snap.content))
+            snap_ref = f"S:{short_id(snap.id)}"
+            refs[snap_ref] = None
+            label = f"Snapshot: {link.title or link.url} v{snap.version} ({len(snap.content.split())} words)"
+            items.append(GateItem(f"snapshot:{snap.id}", "snapshot", label, f"{snap_ref}\n{snap.content}", ref=snap_ref))
     return ReviewMaterial(items, refs, sum(link.sensitive for link in links))
 
 
@@ -102,52 +107,109 @@ def latest_review(db: Session, project: Project, completed: bool = False) -> Rev
     return db.scalars(stmt.order_by(Review.created_at.desc())).first()
 
 
+SPLITTABLE = ("requirements", "snapshot")
+CITATION = re.compile(r"\b(?:F|R|L|S):[0-9a-f]{8}\b|\bREQ:\d+\b")
+
+
+def plan_batches(items: list[GateItem], budget_tokens: int) -> list[list[GateItem]]:
+    """Pack approved items into calls that each fit the model's context.
+
+    Context items (idea, history, link notes) ride in every call. Long documents are split on line boundaries,
+    each part keeping its citation tags, so every reference stays checkable against what that call saw.
+    """
+    fixed = [i for i in items if i.kind not in SPLITTABLE]
+    room = budget_tokens - sum(i.tokens for i in fixed)
+    documents = [i for i in items if i.kind in SPLITTABLE]
+    if not documents:
+        return [fixed]
+    if room < 500:
+        raise DomainError("The history and notes alone fill the model's context. Approve fewer items or raise the context size.")
+    pieces: list[GateItem] = []
+    for doc in documents:
+        pieces += [doc] if doc.tokens <= room else _split(doc, room)
+    batches: list[list[GateItem]] = [[]]
+    for piece in pieces:
+        if batches[-1] and sum(p.tokens for p in batches[-1]) + piece.tokens > room:
+            batches.append([])
+        batches[-1].append(piece)
+    return [fixed + batch for batch in batches]
+
+
+def _split(doc: GateItem, room: int) -> list[GateItem]:
+    header = f"{doc.ref} (continued)\n" if doc.ref else ""
+    limit = (room - len(header) // gate.CHARS_PER_TOKEN - 1) * gate.CHARS_PER_TOKEN
+    parts, current = [], ""
+    for line in doc.text.splitlines(keepends=True):
+        while len(line) > limit:
+            parts.append(current + line[: limit - len(current)])
+            line, current = line[limit - len(current):], ""
+        if len(current) + len(line) > limit:
+            parts.append(current)
+            current = ""
+        current += line
+    if current:
+        parts.append(current)
+    total = len(parts)
+    return [
+        GateItem(f"{doc.id}#{n}", doc.kind, f"{doc.label}, part {n} of {total}",
+                 part if n == 1 or not header else header + part, ref=doc.ref)
+        for n, part in enumerate(parts, start=1)
+    ]
+
+
 def run_review(
     db: Session, ai: AIClient | None, settings: Settings, project: Project, approved_ids: set[str], at: datetime
 ) -> tuple[Review, int]:
-    """Send the approved items for review. Returns the review and how many drafts were dropped for bad references."""
-    if project.status != ProjectStatus.DRAFT:
-        raise DomainError("Reviews run before a project starts.")
+    """Send the approved items for review, in as many calls as the context needs.
+
+    Returns the review and how many drafts were dropped because they cited something their call did not see.
+    """
+    if project.status == ProjectStatus.CLOSED:
+        raise DomainError("A closed project cannot be reviewed.")
+    if ai is None:
+        raise gate.AIUnavailable("AI is not configured on the server. Set PREFLIGHT_ANTHROPIC_API_KEY or run Ollama.")
     found = material(db, project)
-    output, call = gate.run(db, ai, settings, project.user_id, REVIEW, found.items, approved_ids, at)
-    assert isinstance(output, ReviewOutput)
-    sent_refs = {ref for ref in found.refs if _ref_was_sent(ref, approved_ids)}
-    drafts, dropped = [], 0
-    for kind, entries in (("gap", output.gaps), ("item", output.checklist_items)):
-        for entry in entries:
-            if entry.source_ref not in sent_refs:
-                dropped += 1
-                continue
-            drafts.append({"kind": kind, "text": entry.text, "why": entry.why, "source_ref": entry.source_ref,
-                           "priority": getattr(entry, "priority", "medium")})
+    payload = gate.build_payload(found.items, approved_ids)
+    questions: dict[str, tuple[str, str]] = {}
+    drafts, dropped, call_ids = [], 0, []
+    for batch in plan_batches(payload, gate.input_budget(ai, REVIEW)):
+        output, call = gate.run(db, ai, settings, project.user_id, REVIEW, batch, {i.id for i in batch}, at)
+        assert isinstance(output, ReviewOutput)
+        call_ids.append(str(call.id))
+        seen = set(CITATION.findall("\n".join(i.text for i in batch)))
+        for q in output.questions:
+            questions.setdefault(" ".join(q.question.lower().split()), (q.category, q.question))
+        for kind, entries in (("gap", output.gaps), ("item", output.checklist_items)):
+            for entry in entries:
+                if entry.source_ref not in seen or entry.source_ref not in found.refs:
+                    dropped += 1
+                    continue
+                drafts.append({"kind": kind, "text": entry.text, "why": entry.why, "source_ref": entry.source_ref,
+                               "priority": getattr(entry, "priority", "medium")})
     current = latest_requirements(project)
     review = Review(
         user_id=project.user_id,
         project_id=project.id,
         requirements_version=current.version if current else None,
+        material_hash=material_hash(found),
         approved_items=sorted(approved_ids),
-        ai_call_id=call.id,
+        ai_call_ids=call_ids,
         drafts=drafts,
     )
     db.add(review)
     db.flush()
-    for position, q in enumerate(output.questions, start=1):
-        review.questions.append(ReviewQuestion(user_id=project.user_id, review_id=review.id, position=position, category=q.category, question=q.question))
-    db.flush()
+    for position, (category, question) in enumerate(list(questions.values())[:MAX_QUESTIONS], start=1):
+        review.questions.append(ReviewQuestion(user_id=project.user_id, review_id=review.id, position=position, category=category, question=question))
+    db.commit()
     return review, dropped
 
 
-def _ref_was_sent(ref: str, approved: set[str]) -> bool:
-    prefix = ref.split(":")[0]
-    if prefix in ("F", "R"):
-        return "history" in approved
-    if prefix == "REQ":
-        return any(a.startswith("req:") for a in approved)
-    if prefix == "L":
-        return any(a.startswith("link:") and a.split(":")[1].startswith(ref[2:]) for a in approved)
-    if prefix == "S":
-        return any(a.startswith("snapshot:") and a.split(":")[1].startswith(ref[2:]) for a in approved)
-    return False
+def material_hash(found: ReviewMaterial) -> str:
+    """Changes whenever anything that could be sent changes: requirements, links, notes, snapshots, history."""
+    digest = hashlib.sha256()
+    for item in sorted(gate.offerable(found.items), key=lambda i: i.id):
+        digest.update(f"{item.id}\0{item.text}\0".encode())
+    return digest.hexdigest()
 
 
 def get_review(db: Session, user_id: uuid.UUID, review_id: uuid.UUID) -> Review:

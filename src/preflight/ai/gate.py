@@ -28,6 +28,7 @@ class GateItem:
     text: str
     sensitive: bool = False
     cacheable: bool = False
+    ref: str | None = None
 
     @property
     def tokens(self) -> int:
@@ -57,10 +58,19 @@ def build_payload(items: list[GateItem], approved_ids: set[str]) -> list[GateIte
     return [item for item in items if item.id in approved_ids]
 
 
+def output_tokens(ai: AIClient, prompt: Prompt) -> int:
+    """The reply allowance, capped at a quarter of the context so small local models keep room for the input."""
+    return min(prompt.max_tokens, ai.context_tokens // 4)
+
+
+def input_budget(ai: AIClient, prompt: Prompt) -> int:
+    return ai.context_tokens - output_tokens(ai, prompt) - len(prompt.system) // CHARS_PER_TOKEN - 500
+
+
 def estimate(ai: AIClient, prompt: Prompt, items: list[GateItem]) -> Estimate:
     model = ai.model_for(prompt.role)
     tokens = sum(i.tokens for i in items) + len(prompt.system) // CHARS_PER_TOKEN
-    return Estimate(model, tokens, round(ai.price(model, tokens, prompt.max_tokens), 4))
+    return Estimate(model, tokens, round(ai.price(model, tokens, output_tokens(ai, prompt)), 4))
 
 
 def spent_this_month(db: Session, user_id: uuid.UUID, at: datetime) -> float:
@@ -106,7 +116,9 @@ def run(
     call.cost_usd = 0.0
     try:
         for _ in range(2):
-            completion = ai.complete(model=call.model, system=prompt.system, content=content, schema=schema, max_tokens=prompt.max_tokens)
+            completion = ai.complete(
+                model=call.model, system=prompt.system, content=content, schema=schema, max_tokens=output_tokens(ai, prompt)
+            )
             call.input_tokens += completion.input_tokens
             call.output_tokens += completion.output_tokens
             call.cost_usd += ai.price(

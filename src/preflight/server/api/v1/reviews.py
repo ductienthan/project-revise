@@ -74,7 +74,7 @@ def _ai(request: Request):
 
 
 def review_out(db, r: Review, dropped: int = 0) -> ReviewOut:
-    call = db.get(AiCall, r.ai_call_id)
+    calls = [db.get(AiCall, uuid.UUID(call_id)) for call_id in r.ai_call_ids]
     return ReviewOut(
         id=r.id,
         requirements_version=r.requirements_version,
@@ -82,7 +82,7 @@ def review_out(db, r: Review, dropped: int = 0) -> ReviewOut:
         drafts=r.drafts,
         accepted_drafts=r.accepted_drafts,
         dropped_drafts=dropped,
-        cost_usd=round(call.cost_usd, 4),
+        cost_usd=round(sum(c.cost_usd for c in calls), 4),
         completed=r.completed_at is not None,
     )
 
