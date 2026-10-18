@@ -21,9 +21,11 @@ uv run preflight new my-project
 uv run preflight my-project add-link https://example.com/docs --capture
 uv run preflight my-project start           # approve what AI sees, answer its questions, work the gate
 uv run preflight my-project fail "Retry loop hung"
+uv run preflight my-project review          # review again after requirements or links change
 uv run preflight my-project close           # retrospective
 uv run preflight drill                      # practice drills from past failures
 uv run preflight report --week
+uv run preflight import old-failures.csv    # backfill: project,title,date plus optional fields
 ```
 
 Run `preflight --help` and `preflight <project> --help` for every command.
@@ -44,9 +46,25 @@ Both use SQLite by default. To run them against Postgres, set `PREFLIGHT_TEST_DA
 
 The server and CLI read `PREFLIGHT_*` environment variables. `.env.example` lists them. In production, set `PREFLIGHT_REQUIRE_HTTPS=true` and point `PREFLIGHT_DATABASE_URL` at Postgres.
 
-AI features need `PREFLIGHT_ANTHROPIC_API_KEY`. Without it, everything except the AI review, AI suggestions, and AI drill grading still works. Reviews use Claude Opus 5.5 and the smaller tasks use Claude Haiku 5.5 (`PREFLIGHT_REVIEW_MODEL`, `PREFLIGHT_SMALL_MODEL`). `PREFLIGHT_AI_MONTHLY_BUDGET_USD` (default 5) stops AI calls once the month's logged spend reaches it. Set a matching spend limit in the Anthropic Console as well.
+### AI providers
 
-Link capture fetches public pages only. Each request connects to an address that was checked as public, so it cannot be turned against the server's own network. Pages that need JavaScript are skipped unless you set `PREFLIGHT_CAPTURE_BROWSER=true` and install the browser extra (`uv sync --extra browser`, then `uv run playwright install chromium`). The browser does its own DNS lookups, so its address check cannot pin addresses the same way. Leave it off on an internet-facing server unless you need it.
+With `PREFLIGHT_ANTHROPIC_API_KEY` set, reviews use Claude Opus 5.5 and the smaller tasks use Claude Haiku 5.5 (`PREFLIGHT_REVIEW_MODEL`, `PREFLIGHT_SMALL_MODEL`). `PREFLIGHT_AI_MONTHLY_BUDGET_USD` (default 5) refuses any call whose worst-case cost would pass the month's budget. Set a matching spend limit in the Anthropic Console as well.
+
+Without a key, the server uses a local [Ollama](https://ollama.com) at `PREFLIGHT_OLLAMA_URL` (default `http://127.0.0.1:11434`). It picks the largest installed model unless `PREFLIGHT_OLLAMA_MODEL` is set, and splits long material to fit `PREFLIGHT_OLLAMA_CONTEXT_TOKENS` (default 32768). Local calls cost nothing and the data stays on the machine running Ollama. Every item still needs your approval before it is sent. Set `PREFLIGHT_AI_PROVIDER` to `anthropic`, `ollama`, or `off` to choose explicitly; the default `auto` behaves as described.
+
+Without either provider, everything except the AI review, AI suggestions, and AI drill grading still works.
+
+### Checking the review prompt
+
+`tests/golden/review_payload.txt` holds the exact payload for a fixed project, so a prompt change shows up as a diff. Regenerate it with `PREFLIGHT_UPDATE_GOLDEN=1 uv run pytest tests/test_golden.py` after an intended change.
+
+`scripts/eval_review.py` runs the real review on the cases in `evals/review_cases.json` against the configured provider and scores how many relevant past failures the review addresses, how many unrelated ones it drags in, how many drafts it drops, and which question categories it covers. Results go to `evals/results/`. With Ollama it costs nothing:
+
+```sh
+PREFLIGHT_OLLAMA_MODEL=gemma4:12b uv run python scripts/eval_review.py --trials 3
+```
+
+Link capture fetches public pages only. Each request connects to an address that was checked as public, so it cannot be turned against the server's own network. Pages that need JavaScript are skipped unless you set `PREFLIGHT_CAPTURE_BROWSER=true` and install the browser extra (`uv sync --extra browser`, then `uv run playwright install chromium`). Every request the browser makes passes the same public-address check, but the browser does its own DNS lookups, so it cannot pin addresses the way plain capture does. Leave it off on an internet-facing server unless you need it.
 
 ## Behind a proxy
 

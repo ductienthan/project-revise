@@ -123,3 +123,10 @@ def test_live_ollama_classifies_a_failure():
                                  schema=strict_schema(ClassifyOutput), max_tokens=512)
     parsed = ClassifyOutput.model_validate_json(completion.text)
     assert parsed.root_cause.strip() and parsed.prevention.strip() and completion.output_tokens > 0
+
+
+def test_an_empty_model_setting_means_pick_one(monkeypatch):
+    settings = Settings(ai_provider="ollama", ollama_model="", ollama_small_model="", _env_file=None)
+    ollama = make_client(settings)
+    ollama.http = httpx.Client(base_url=ollama.url, transport=httpx.MockTransport(FakeOllama()))
+    assert ollama.model_for("review") == "gemma4:12b"

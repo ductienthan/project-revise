@@ -11,5 +11,7 @@ def make_client(settings: Settings) -> AIClient | None:
     if provider in ("auto", "anthropic") and settings.anthropic_api_key:
         return AnthropicClient(settings.anthropic_api_key, settings.anthropic_base_url, settings.review_model, settings.small_model)
     if provider in ("auto", "ollama"):
-        return OllamaClient(settings.ollama_url, settings.ollama_model, settings.ollama_small_model, settings.ollama_context_tokens)
+        return OllamaClient(
+            settings.ollama_url, settings.ollama_model or None, settings.ollama_small_model or None, settings.ollama_context_tokens
+        )
     return None
