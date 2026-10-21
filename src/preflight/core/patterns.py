@@ -11,7 +11,8 @@ REPEAT_THRESHOLD = 2
 
 
 def detect_patterns(db: Session, user_id: uuid.UUID) -> list[Pattern]:
-    """Recount repeated categories, within each project and across all projects. Safe to rerun."""
+    """Recount repeated categories, within each project and across all projects. A category that no longer repeats
+    is dropped, or kept recounted and unsuggested when a rule was approved from it. Safe to rerun."""
     rows = db.execute(
         select(Failure.project_id, Failure.category).where(Failure.user_id == user_id, Failure.category.is_not(None))
     ).all()
@@ -22,20 +23,32 @@ def detect_patterns(db: Session, user_id: uuid.UUID) -> list[Pattern]:
 
     names = dict(db.execute(select(Project.id, Project.name).where(Project.user_id == user_id)).all())
     existing = {(p.project_scope, p.category): p for p in db.scalars(select(Pattern).where(Pattern.user_id == user_id))}
-    for (scope, category), count in counts.items():
-        if count < REPEAT_THRESHOLD:
-            continue
+    ruled = set(db.scalars(select(Rule.pattern_id).where(Rule.user_id == user_id)))
+    repeated = []
+    for scope, category in set(counts) | set(existing):
+        count, pattern = counts[(scope, category)], existing.get((scope, category))
         where = f"in {names[scope]}" if scope else "across projects"
-        label = f"{category} ({count} failures {where})"
-        pattern = existing.get((scope, category))
+        label = f"{category} ({count} failure{'' if count == 1 else 's'} {where})"
+        if count < REPEAT_THRESHOLD:
+            if pattern is None:
+                continue
+            if pattern.id in ruled:
+                pattern.label, pattern.failure_count = label, count
+            else:
+                db.delete(pattern)
+            continue
         if pattern is None:
             pattern = Pattern(user_id=user_id, project_scope=scope, category=category, label=label, failure_count=count)
             db.add(pattern)
-            existing[(scope, category)] = pattern
         else:
             pattern.label, pattern.failure_count = label, count
+        repeated.append(pattern)
     db.flush()
-    return sorted(existing.values(), key=lambda p: (-p.failure_count, p.category))
+    return sorted(repeated, key=lambda p: (-p.failure_count, p.category))
+
+
+def pattern_labels(db: Session, user_id: uuid.UUID) -> dict[uuid.UUID, str]:
+    return dict(db.execute(select(Pattern.id, Pattern.label).where(Pattern.user_id == user_id)).all())
 
 
 def pattern_failures(db: Session, pattern: Pattern) -> list[Failure]:

@@ -1,9 +1,12 @@
+import uuid
+
 import pytest
 
 from tests.test_capture import fail, new_project
 
 TIMEOUT_CHECK = "Every external call has a timeout, retry cap, and backoff"
 ATOMIC_CHECK = "Read-then-write on shared state is atomic"
+ATOMIC_CATEGORY = "state or concurrency bug"
 
 
 @pytest.fixture
@@ -151,3 +154,55 @@ def test_checklist_exports_as_markdown(history):
     assert md.startswith("# Checklist: gateway")
     assert "Built from requirements v1." in md
     assert f"- [x] **1.** {item['text']}" in md
+
+
+def failure_named(api, title):
+    return next(f for f in api.get("/api/v1/failures").json() if f["title"] == title)
+
+
+def recategorize(api, title, category="knowledge gap"):
+    failure = failure_named(api, title)
+    response = api.patch(f"/api/v1/failures/{failure['id']}", json={"category": category})
+    assert response.status_code == 200, response.text
+
+
+def test_a_pattern_that_stops_repeating_is_dropped_and_no_longer_suggested(app, history):
+    assert len([s for s in history.get("/api/v1/patterns").json() if s["pattern"]["category"] == ATOMIC_CATEGORY]) == 2
+    recategorize(history, "Two workers double-charged")
+
+    suggestions = history.get("/api/v1/patterns").json()
+    assert not [s for s in suggestions if s["pattern"]["category"] == ATOMIC_CATEGORY]
+    failures = history.get("/api/v1/failures").json()
+    for s in suggestions:
+        scope, category = s["pattern"]["project_scope"], s["pattern"]["category"]
+        live = [f for f in failures if f["category"] == category and scope in (None, f["project_id"])]
+        assert s["pattern"]["failure_count"] == len(live), s["pattern"]["label"]
+
+    from preflight.db.models import Pattern
+
+    with app.state.sessionmaker() as db:
+        assert [p.label for p in db.query(Pattern) if p.category == ATOMIC_CATEGORY] == []
+
+
+def test_an_approved_rule_survives_its_pattern_falling_below_the_threshold(app, history, web):
+    pattern = next(
+        s["pattern"] for s in history.get("/api/v1/patterns").json()
+        if s["pattern"]["category"] == ATOMIC_CATEGORY and s["pattern"]["project_scope"] is None
+    )
+    rule = history.post("/api/v1/rules", json={"pattern_id": pattern["id"], "checklist_text": "Rule: shared-state-safety"}).json()
+    recategorize(history, "Two workers double-charged")
+
+    assert not [s for s in history.get("/api/v1/patterns").json() if s["pattern"]["id"] == pattern["id"]]
+    assert [(r["id"], r["status"]) for r in history.get("/api/v1/rules").json()] == [(rule["id"], "active")]
+
+    new_project(history)
+    assert by_text(start(history)["checklist"])["Rule: shared-state-safety"]["source_type"] == "rule"
+
+    page = web.get("/rules").text
+    assert "Rule: shared-state-safety" in page and f"{ATOMIC_CATEGORY} (1 failure across projects)" in page
+
+    from preflight.db.models import Pattern
+
+    with app.state.sessionmaker() as db:
+        kept = db.get(Pattern, uuid.UUID(pattern["id"]))
+        assert kept is not None and kept.failure_count == 1

@@ -360,7 +360,8 @@
   "id": "FR-33",
   "status": "met",
   "tests": [
-   "test_checklist.py::test_patterns_suggest_a_rule_drafted_from_prevention_notes"
+   "test_checklist.py::test_patterns_suggest_a_rule_drafted_from_prevention_notes",
+   "test_checklist.py::test_a_pattern_that_stops_repeating_is_dropped_and_no_longer_suggested"
   ],
   "e2e": [
    "repeated pattern is detected with a rule drafted from prevention notes"
@@ -371,7 +372,8 @@
   "status": "met",
   "tests": [
    "test_checklist.py::test_patterns_suggest_a_rule_drafted_from_prevention_notes",
-   "test_dashboard.py::test_rules_page_approves_a_suggested_rule"
+   "test_dashboard.py::test_rules_page_approves_a_suggested_rule",
+   "test_checklist.py::test_a_pattern_that_stops_repeating_is_dropped_and_no_longer_suggested"
   ],
   "e2e": [
    "repeated pattern is detected with a rule drafted from prevention notes",
@@ -395,7 +397,8 @@
   "status": "met",
   "tests": [
    "test_progress.py::test_rule_verdict_is_given_after_the_observation_period",
-   "test_metrics.py::test_rule_verdicts"
+   "test_metrics.py::test_rule_verdicts",
+   "test_checklist.py::test_an_approved_rule_survives_its_pattern_falling_below_the_threshold"
   ],
   "e2e": [
    "dashboard progress page shows the rule scoreboard"
@@ -482,6 +485,16 @@
    "importing the same file twice adds nothing",
    "backfilled failures keep their original dates"
   ]
+ },
+ {
+  "id": "FR-43",
+  "status": "met",
+  "tests": [
+   "test_checklist.py::test_a_pattern_that_stops_repeating_is_dropped_and_no_longer_suggested",
+   "test_checklist.py::test_an_approved_rule_survives_its_pattern_falling_below_the_threshold"
+  ],
+  "e2e": [],
+  "note": "A pattern a rule was approved from is kept and recounted, so the rule keeps its pattern; only patterns no rule points at are deleted."
  },
  {
   "id": "MET-failures-per-project",

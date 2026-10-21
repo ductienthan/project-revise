@@ -136,6 +136,7 @@ Each step is a command in [the CLI reference](cli.md). Steps 1 and 6 also work i
 - **FR-36** Each rule gets a verdict after an observation period: working when its category failed less often after the rule than before, and needs revision otherwise. I retire a rule by hand.
 - **FR-37** Generate drills from the failures of closed projects and schedule them at 1, 3, 7, and 21 days, then further apart. A poor answer starts the schedule over.
 - **FR-38** I grade a drill answer myself, or AI grades it with my approval.
+- **FR-43** Every look at my patterns recounts them from my failures. A category that no longer repeats stops being suggested and its pattern is dropped, unless I already approved a rule from it: that rule stays until I retire it.
 
 ### Reports and export
 

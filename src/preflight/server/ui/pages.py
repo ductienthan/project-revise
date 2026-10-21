@@ -217,7 +217,7 @@ def rules_page(request: Request, principal: PagePrincipal, db: Db) -> HTMLRespon
     suggestions = [
         (p, patterns.draft_rule_text(patterns.pattern_failures(db, p))) for p in found if patterns.live_rule(db, p) is None
     ]
-    labels = {p.id: p.label for p in found}
+    labels = patterns.pattern_labels(db, principal.user.id)
     return render(
         request, "rules.html", principal, suggestions=suggestions, rules=patterns.list_rules(db, principal.user.id), labels=labels
     )

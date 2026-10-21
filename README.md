@@ -106,7 +106,7 @@ It runs these steps:
 1. `ruff` on the source, tests, and scripts.
 2. `scripts/check_review_migration.py`, which proves the data migration round trip on a throwaway database.
 3. `scripts/validate_requirements.py`, which runs the test suite and `scripts/e2e.py` once and checks every requirement against them. [`validation/requirements.json`](validation/requirements.json) maps each requirement to the tests and end-to-end checks that prove it. The script fails when a requirement in the document has no entry, when an entry marked met has no evidence or cites a test that does not exist, or when any cited evidence fails. It writes [the validation report](validation/report.md).
-4. `scripts/mutation_check.py`, which breaks 20 protections on purpose in a throwaway copy of the code, such as the start gate, the AI approval gate, CSRF, data separation between accounts, and the private-address guard. It confirms the tests catch every one.
+4. `scripts/mutation_check.py`, which breaks 21 protections on purpose in a throwaway copy of the code, such as the start gate, the AI approval gate, CSRF, data separation between accounts, and the private-address guard. It confirms the tests catch every one.
 
 When you add or change a requirement, update its entry in `validation/requirements.json`. When you add a protection, add a mutation for it. When you change a command, a setting, an endpoint, or a table, regenerate the references:
 
